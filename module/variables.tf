@@ -113,3 +113,92 @@ variable "network_security_policies" {
     error_message = "Each network security policy rule 'spec' must set exactly one of: two_env_isolation_rule_spec, application_rule_spec, intra_entity_group_rule_spec."
   }
 }
+
+##################################################
+# Data Lookups
+##################################################
+
+variable "enable_data_lookups" {
+  description = "When true, enables read-only data-source lookups of existing entities (e.g. key management servers). Defaults to false so the module plans cleanly without live Prism Central connectivity."
+  type        = bool
+  default     = false
+}
+
+##################################################
+# Key Management Servers (v2)
+##################################################
+
+variable "key_management_servers" {
+  description = <<-EOT
+    A map of external key management servers (KMS) to register for cluster
+    data-at-rest encryption (nutanix_key_management_server_v2). Each entry sets a
+    name and EXACTLY ONE access-information block: `azure` (Azure Key Vault) or
+    `kmip` (a KMIP-compliant vault). This variable carries NON-SECRET config
+    only; credential material (client secret, CA/cert PEM, private key) is
+    supplied separately via the sensitive `key_management_server_credentials`
+    variable, keyed by the same map key.
+  EOT
+  type = map(object({
+    name = string
+
+    azure = optional(object({
+      client_id              = string
+      tenant_id              = string
+      key_id                 = string
+      endpoint_url           = string
+      credential_expiry_date = string
+    }), null)
+
+    kmip = optional(object({
+      ca_name = string
+      endpoints = list(object({
+        port = number
+        ipv4 = optional(list(object({
+          value         = string
+          prefix_length = optional(number, null)
+        })), [])
+        ipv6 = optional(list(object({
+          value         = string
+          prefix_length = optional(number, null)
+        })), [])
+        fqdn = optional(list(object({
+          value = string
+        })), [])
+      }))
+    }), null)
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for k, v in var.key_management_servers :
+      (v.azure != null ? 1 : 0) + (v.kmip != null ? 1 : 0) == 1
+    ])
+    error_message = "Each key management server must set exactly one access-information block: either 'azure' or 'kmip'."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.key_management_servers : length(v.name) > 0
+    ])
+    error_message = "Each key management server must define a non-empty 'name'."
+  }
+}
+
+variable "key_management_server_credentials" {
+  description = <<-EOT
+    Sensitive credential material for the key management servers declared in
+    `key_management_servers`, keyed by the SAME map key. Azure entries supply
+    `client_secret`; KMIP entries supply `ca_pem`, `cert_pem` and `private_key`.
+    Feed these from environment-backed TF_VAR_* inputs — never from YAML or
+    committed files (spec §10).
+  EOT
+  type = map(object({
+    client_secret = optional(string, null) # Azure Key Vault
+    ca_pem        = optional(string, null) # KMIP
+    cert_pem      = optional(string, null) # KMIP
+    private_key   = optional(string, null) # KMIP
+  }))
+  default   = {}
+  sensitive = true
+}

@@ -96,3 +96,72 @@ resource "nutanix_network_security_policy_v2" "policy" {
     }
   }
 }
+
+##################################################
+# Key Management Servers (v2)
+##################################################
+
+# Registers external key management servers used for cluster data-at-rest
+# encryption. Each entry carries exactly one access-information block (Azure Key
+# Vault or KMIP). Non-secret config comes from var.key_management_servers;
+# credential material (client secret, CA/cert PEM, private key) is pulled from
+# the sensitive var.key_management_server_credentials, keyed by the same map key.
+resource "nutanix_key_management_server_v2" "key_management_server" {
+  for_each = var.key_management_servers
+
+  name = each.value.name
+
+  access_information {
+    dynamic "azure_key_vault" {
+      for_each = each.value.azure != null ? [each.value.azure] : []
+      content {
+        client_id              = azure_key_vault.value.client_id
+        client_secret          = try(var.key_management_server_credentials[each.key].client_secret, null)
+        credential_expiry_date = azure_key_vault.value.credential_expiry_date
+        endpoint_url           = azure_key_vault.value.endpoint_url
+        key_id                 = azure_key_vault.value.key_id
+        tenant_id              = azure_key_vault.value.tenant_id
+      }
+    }
+
+    dynamic "kmip_key_vault" {
+      for_each = each.value.kmip != null ? [each.value.kmip] : []
+      content {
+        ca_name     = kmip_key_vault.value.ca_name
+        ca_pem      = try(var.key_management_server_credentials[each.key].ca_pem, null)
+        cert_pem    = try(var.key_management_server_credentials[each.key].cert_pem, null)
+        private_key = try(var.key_management_server_credentials[each.key].private_key, null)
+
+        dynamic "endpoint_url" {
+          for_each = kmip_key_vault.value.endpoints
+          content {
+            port = endpoint_url.value.port
+
+            ip_address {
+              dynamic "fqdn" {
+                for_each = endpoint_url.value.fqdn
+                content {
+                  value = fqdn.value.value
+                }
+              }
+              dynamic "ipv4" {
+                for_each = endpoint_url.value.ipv4
+                content {
+                  value         = ipv4.value.value
+                  prefix_length = ipv4.value.prefix_length
+                }
+              }
+              dynamic "ipv6" {
+                for_each = endpoint_url.value.ipv6
+                content {
+                  value         = ipv6.value.value
+                  prefix_length = ipv6.value.prefix_length
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
