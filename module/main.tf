@@ -98,6 +98,78 @@ resource "nutanix_network_security_policy_v2" "policy" {
 }
 
 ##################################################
+# Address Groups (v2 - Flow)
+##################################################
+
+# One nutanix_address_groups_v2 per entry: a reusable IP set referenced by
+# network security policy application rules. Members are IPv4 addresses (value +
+# prefix_length) and/or IP ranges (start_ip/end_ip); at least one is required
+# (enforced by var.address_groups validation and the address_groups_have_members
+# check).
+resource "nutanix_address_groups_v2" "address_group" {
+  for_each = var.address_groups
+
+  name        = each.value.name
+  description = each.value.description
+
+  dynamic "ipv4_addresses" {
+    for_each = each.value.ipv4_addresses
+    content {
+      value         = ipv4_addresses.value.value
+      prefix_length = ipv4_addresses.value.prefix_length
+    }
+  }
+
+  dynamic "ip_ranges" {
+    for_each = each.value.ip_ranges
+    content {
+      start_ip = ip_ranges.value.start_ip
+      end_ip   = ip_ranges.value.end_ip
+    }
+  }
+}
+
+##################################################
+# Service Groups (v2 - Flow)
+##################################################
+
+# One nutanix_service_groups_v2 per entry: a reusable port/protocol set
+# referenced by network security policy application rules. Carries TCP/UDP port
+# ranges and/or ICMP services; at least one service is required (enforced by
+# var.service_groups validation and the service_groups_have_services check).
+resource "nutanix_service_groups_v2" "service_group" {
+  for_each = var.service_groups
+
+  name        = each.value.name
+  description = each.value.description
+
+  dynamic "tcp_services" {
+    for_each = each.value.tcp_services
+    content {
+      start_port = tcp_services.value.start_port
+      end_port   = tcp_services.value.end_port
+    }
+  }
+
+  dynamic "udp_services" {
+    for_each = each.value.udp_services
+    content {
+      start_port = udp_services.value.start_port
+      end_port   = udp_services.value.end_port
+    }
+  }
+
+  dynamic "icmp_services" {
+    for_each = each.value.icmp_services
+    content {
+      is_all_allowed = icmp_services.value.is_all_allowed
+      type           = icmp_services.value.type
+      code           = icmp_services.value.code
+    }
+  }
+}
+
+##################################################
 # Key Management Servers (v2)
 ##################################################
 

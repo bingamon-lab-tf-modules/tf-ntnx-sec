@@ -20,6 +20,30 @@ check "security_policies_have_rules" {
   }
 }
 
+# Validate that every address group defines at least one member (an IPv4 address
+# or an IP range). Mirrors the var.address_groups validation.
+check "address_groups_have_members" {
+  assert {
+    condition = alltrue([
+      for k, v in var.address_groups :
+      length(v.ipv4_addresses) + length(v.ip_ranges) > 0
+    ])
+    error_message = "Each address group must define at least one 'ipv4_addresses' entry or one 'ip_ranges' entry."
+  }
+}
+
+# Validate that every service group defines at least one service (TCP, UDP or
+# ICMP). Mirrors the var.service_groups validation.
+check "service_groups_have_services" {
+  assert {
+    condition = alltrue([
+      for k, v in var.service_groups :
+      length(v.tcp_services) + length(v.udp_services) + length(v.icmp_services) > 0
+    ])
+    error_message = "Each service group must define at least one 'tcp_services', 'udp_services', or 'icmp_services' entry."
+  }
+}
+
 # Validate that every configured key management server exposes an endpoint:
 # Azure requires an endpoint URL; KMIP requires at least one endpoint, each with
 # at least one IPv4/IPv6/FQDN address.

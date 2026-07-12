@@ -41,6 +41,46 @@ output "network_security_policy_ids" {
 }
 
 ##################################################
+# Address Group Outputs (v2 - Flow)
+##################################################
+
+output "address_groups" {
+  description = "Map of created address groups (metadata only)."
+  value = {
+    for k, v in nutanix_address_groups_v2.address_group : k => {
+      ext_id      = v.ext_id
+      name        = v.name
+      description = v.description
+    }
+  }
+}
+
+output "address_group_ids" {
+  description = "Map of address group keys to their external IDs (ext_id)."
+  value       = { for k, v in nutanix_address_groups_v2.address_group : k => v.ext_id }
+}
+
+##################################################
+# Service Group Outputs (v2 - Flow)
+##################################################
+
+output "service_groups" {
+  description = "Map of created service groups (metadata only)."
+  value = {
+    for k, v in nutanix_service_groups_v2.service_group : k => {
+      ext_id      = v.ext_id
+      name        = v.name
+      description = v.description
+    }
+  }
+}
+
+output "service_group_ids" {
+  description = "Map of service group keys to their external IDs (ext_id)."
+  value       = { for k, v in nutanix_service_groups_v2.service_group : k => v.ext_id }
+}
+
+##################################################
 # Key Management Server Outputs (v2)
 ##################################################
 
@@ -91,6 +131,8 @@ output "security_summary" {
     isolation_policies           = length(local.isolation_policies)
     application_policies         = length(local.application_policies)
     quarantine_policies          = length(local.quarantine_policies)
+    total_address_groups         = length(var.address_groups)
+    total_service_groups         = length(var.service_groups)
     total_key_management_servers = length(var.key_management_servers)
     azure_key_management_servers = length(local.azure_key_management_servers)
     kmip_key_management_servers  = length(local.kmip_key_management_servers)

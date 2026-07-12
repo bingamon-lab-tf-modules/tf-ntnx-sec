@@ -9,6 +9,28 @@ data "nutanix_categories_v2" "existing_categories" {}
 data "nutanix_network_security_policies_v2" "existing_policies" {}
 
 ##################################################
+# Address Groups (v2 - Flow)
+##################################################
+
+# Gated read-only lookup of existing Flow address groups. Disabled by default
+# (enable_data_lookups = false) so the module plans without live Prism Central
+# connectivity; enable it to reconcile against already-defined address groups.
+data "nutanix_address_groups_v2" "existing_address_groups" {
+  count = var.enable_data_lookups ? 1 : 0
+}
+
+##################################################
+# Service Groups (v2 - Flow)
+##################################################
+
+# Gated read-only lookup of existing Flow service groups. Disabled by default
+# (enable_data_lookups = false) so the module plans without live Prism Central
+# connectivity; enable it to reconcile against already-defined service groups.
+data "nutanix_service_groups_v2" "existing_service_groups" {
+  count = var.enable_data_lookups ? 1 : 0
+}
+
+##################################################
 # Key Management Servers (v2)
 ##################################################
 

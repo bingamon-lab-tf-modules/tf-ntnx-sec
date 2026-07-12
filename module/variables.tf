@@ -115,6 +115,118 @@ variable "network_security_policies" {
 }
 
 ##################################################
+# Address Groups (v2 - Flow)
+##################################################
+
+variable "address_groups" {
+  description = <<-EOT
+    A map of Flow address groups (reusable IP sets) to manage
+    (nutanix_address_groups_v2). Each entry sets a name and at least one member:
+    an `ipv4_addresses` entry (a value + prefix_length, e.g. 10.0.10.0/24) or an
+    `ip_ranges` entry (start_ip/end_ip). Address groups are referenced by
+    network security policy application rules via their ext_id
+    (`src_address_group_references` / `dest_address_group_references`).
+  EOT
+  type = map(object({
+    name        = string
+    description = optional(string, null)
+    ipv4_addresses = optional(list(object({
+      value         = string
+      prefix_length = number
+    })), [])
+    ip_ranges = optional(list(object({
+      start_ip = string
+      end_ip   = string
+    })), [])
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for k, v in var.address_groups : length(trimspace(v.name)) > 0
+    ])
+    error_message = "Each address group must define a non-empty 'name'."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.address_groups :
+      length(v.ipv4_addresses) + length(v.ip_ranges) > 0
+    ])
+    error_message = "Each address group must define at least one 'ipv4_addresses' entry or one 'ip_ranges' entry."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.address_groups : alltrue([
+        for a in v.ipv4_addresses : a.prefix_length >= 0 && a.prefix_length <= 32
+      ])
+    ])
+    error_message = "Each address group 'ipv4_addresses' entry must set a 'prefix_length' between 0 and 32."
+  }
+}
+
+##################################################
+# Service Groups (v2 - Flow)
+##################################################
+
+variable "service_groups" {
+  description = <<-EOT
+    A map of Flow service groups (reusable port/protocol sets) to manage
+    (nutanix_service_groups_v2). Each entry sets a name and at least one service:
+    `tcp_services` / `udp_services` (start_port/end_port ranges) or
+    `icmp_services` (type/code, or is_all_allowed). Service groups are referenced
+    by network security policy application rules via their ext_id
+    (`service_group_references`).
+  EOT
+  type = map(object({
+    name        = string
+    description = optional(string, null)
+    tcp_services = optional(list(object({
+      start_port = number
+      end_port   = number
+    })), [])
+    udp_services = optional(list(object({
+      start_port = number
+      end_port   = number
+    })), [])
+    icmp_services = optional(list(object({
+      is_all_allowed = optional(bool, null)
+      type           = optional(number, null)
+      code           = optional(number, null)
+    })), [])
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for k, v in var.service_groups : length(trimspace(v.name)) > 0
+    ])
+    error_message = "Each service group must define a non-empty 'name'."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.service_groups :
+      length(v.tcp_services) + length(v.udp_services) + length(v.icmp_services) > 0
+    ])
+    error_message = "Each service group must define at least one 'tcp_services', 'udp_services', or 'icmp_services' entry."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.service_groups : alltrue([
+        for s in concat(v.tcp_services, v.udp_services) :
+        s.start_port >= 1 && s.start_port <= 65535 &&
+        s.end_port >= 1 && s.end_port <= 65535 &&
+        s.start_port <= s.end_port
+      ])
+    ])
+    error_message = "Each service group TCP/UDP service port must be between 1 and 65535, with 'start_port' <= 'end_port'."
+  }
+}
+
+##################################################
 # Data Lookups
 ##################################################
 
