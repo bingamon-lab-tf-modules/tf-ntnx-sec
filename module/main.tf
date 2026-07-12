@@ -494,3 +494,34 @@ resource "nutanix_cluster_profile_v2" "cluster_profile" {
     }
   }
 }
+
+##################################################
+# Image Placement Policies (v2)
+##################################################
+
+# One nutanix_image_placement_policy_v2 per entry: a governance control that
+# governs which images (matched by category) may land on which clusters (matched
+# by category). SOFT placement is advisory; HARD is enforced. Both the
+# image_entity_filter and cluster_entity_filter are required by the provider and
+# reference categories by ext_id (v4 shape); the image_placement_policies_have_filters
+# check ensures each carries at least one category_ext_id.
+resource "nutanix_image_placement_policy_v2" "image_placement_policy" {
+  for_each = var.image_placement_policies
+
+  name                        = each.value.name
+  description                 = each.value.description
+  placement_type              = each.value.placement_type
+  enforcement_state           = each.value.enforcement_state
+  action                      = each.value.action
+  should_cancel_running_tasks = each.value.should_cancel_running_tasks
+
+  image_entity_filter {
+    type             = each.value.image_entity_filter.type
+    category_ext_ids = length(each.value.image_entity_filter.category_ext_ids) > 0 ? each.value.image_entity_filter.category_ext_ids : null
+  }
+
+  cluster_entity_filter {
+    type             = each.value.cluster_entity_filter.type
+    category_ext_ids = length(each.value.cluster_entity_filter.category_ext_ids) > 0 ? each.value.cluster_entity_filter.category_ext_ids : null
+  }
+}

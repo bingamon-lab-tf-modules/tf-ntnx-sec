@@ -189,6 +189,26 @@ output "cluster_profile_cluster_associations" {
 }
 
 ##################################################
+# Image Placement Policy Outputs (v2)
+##################################################
+
+output "image_placement_policies" {
+  description = "Map of managed image placement policies (metadata only)."
+  value = {
+    for k, v in nutanix_image_placement_policy_v2.image_placement_policy : k => {
+      ext_id         = v.ext_id
+      name           = v.name
+      placement_type = v.placement_type
+    }
+  }
+}
+
+output "image_placement_policy_ids" {
+  description = "Map of image placement policy keys to their external IDs (ext_id)."
+  value       = { for k, v in nutanix_image_placement_policy_v2.image_placement_policy : k => v.ext_id }
+}
+
+##################################################
 # Summary
 ##################################################
 
@@ -209,5 +229,6 @@ output "security_summary" {
     total_ssl_certificates         = length(var.ssl_certificates)
     total_password_change_requests = length(var.password_change_requests)
     total_cluster_profiles         = length(var.cluster_profiles)
+    total_image_placement_policies = length(var.image_placement_policies)
   }
 }

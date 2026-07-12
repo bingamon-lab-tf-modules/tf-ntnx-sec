@@ -659,3 +659,84 @@ variable "cluster_profiles" {
     error_message = "Each cluster profile 'allowed_overrides' value must be one of: NFS_SUBNET_WHITELIST_CONFIG, NTP_SERVER_CONFIG, SNMP_SERVER_CONFIG, SMTP_SERVER_CONFIG, PULSE_CONFIG, NAME_SERVER_CONFIG, RSYSLOG_SERVER_CONFIG."
   }
 }
+
+##################################################
+# Image Placement Policies (v2)
+##################################################
+
+variable "image_placement_policies" {
+  description = <<-EOT
+    A map of image placement policies to manage
+    (nutanix_image_placement_policy_v2) — a governance control that pins which
+    images may land on which clusters by matching image categories against
+    cluster categories. Each entry sets a `name`, a `placement_type` (SOFT =
+    advisory, HARD = enforced), and two REQUIRED category-based filters:
+    `image_entity_filter` (which images the policy governs) and
+    `cluster_entity_filter` (which clusters they may land on). Each filter sets a
+    match `type` (CATEGORIES_MATCH_ALL / CATEGORIES_MATCH_ANY) and a list of
+    `category_ext_ids` — category EXTERNAL IDs (v4 shape), e.g. from this
+    module's `category_ids` output or a nutanix_categories_v2 data lookup.
+
+    NOTE: the image OBJECTS themselves live in tf-ntnx-vm (`images_v2`); only the
+    placement POLICY lives here (spec §4 LZ 5/7).
+  EOT
+  type = map(object({
+    name                        = string
+    description                 = optional(string, null)
+    placement_type              = string                 # SOFT, HARD
+    enforcement_state           = optional(string, null) # ACTIVE, SUSPENDED
+    action                      = optional(string, null) # RESUME, SUSPEND
+    should_cancel_running_tasks = optional(bool, null)
+
+    image_entity_filter = object({
+      type             = string # CATEGORIES_MATCH_ALL, CATEGORIES_MATCH_ANY
+      category_ext_ids = optional(list(string), [])
+    })
+
+    cluster_entity_filter = object({
+      type             = string # CATEGORIES_MATCH_ALL, CATEGORIES_MATCH_ANY
+      category_ext_ids = optional(list(string), [])
+    })
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for k, v in var.image_placement_policies : length(trimspace(v.name)) > 0
+    ])
+    error_message = "Each image placement policy must define a non-empty 'name'."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.image_placement_policies :
+      contains(["SOFT", "HARD"], v.placement_type)
+    ])
+    error_message = "Image placement policy 'placement_type' must be one of: SOFT, HARD."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.image_placement_policies :
+      v.enforcement_state == null || contains(["ACTIVE", "SUSPENDED"], coalesce(v.enforcement_state, "_"))
+    ])
+    error_message = "Image placement policy 'enforcement_state' must be one of: ACTIVE, SUSPENDED."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.image_placement_policies :
+      v.action == null || contains(["RESUME", "SUSPEND"], coalesce(v.action, "_"))
+    ])
+    error_message = "Image placement policy 'action' must be one of: RESUME, SUSPEND."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.image_placement_policies :
+      contains(["CATEGORIES_MATCH_ALL", "CATEGORIES_MATCH_ANY"], v.image_entity_filter.type) &&
+      contains(["CATEGORIES_MATCH_ALL", "CATEGORIES_MATCH_ANY"], v.cluster_entity_filter.type)
+    ])
+    error_message = "Each image placement policy 'image_entity_filter.type' and 'cluster_entity_filter.type' must be one of: CATEGORIES_MATCH_ALL, CATEGORIES_MATCH_ANY."
+  }
+}

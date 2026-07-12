@@ -108,3 +108,14 @@ data "nutanix_clusters_v2" "cluster_profile_cluster" {
 data "nutanix_cluster_profiles_v2" "existing_cluster_profiles" {
   count = var.enable_data_lookups ? 1 : 0
 }
+
+##################################################
+# Image Placement Policies (v2)
+##################################################
+
+# Gated read-only lookup of existing image placement policies. Disabled by
+# default (enable_data_lookups = false) so the module plans without live Prism
+# Central connectivity; enable it to reconcile against already-defined policies.
+data "nutanix_image_placement_policies_v2" "existing_image_placement_policies" {
+  count = var.enable_data_lookups ? 1 : 0
+}

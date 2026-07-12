@@ -142,3 +142,18 @@ check "cluster_profiles_resolve_clusters" {
     error_message = "The following cluster profile 'clusters' names did not resolve to a cluster in Nutanix: ${jsonencode(local.cluster_profile_missing_clusters)}. Ensure each name matches an existing cluster."
   }
 }
+
+# Validate that every image placement policy defines a non-empty image filter AND
+# a non-empty cluster filter (each with at least one category_ext_id). Both
+# filters are required by the provider; a filter with no categories would match
+# nothing (or everything), so surface it here with a clear message.
+check "image_placement_policies_have_filters" {
+  assert {
+    condition = alltrue([
+      for k, v in var.image_placement_policies :
+      length(v.image_entity_filter.category_ext_ids) > 0 &&
+      length(v.cluster_entity_filter.category_ext_ids) > 0
+    ])
+    error_message = "Each image placement policy must define at least one 'category_ext_ids' in BOTH 'image_entity_filter' and 'cluster_entity_filter'."
+  }
+}
