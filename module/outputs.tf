@@ -60,6 +60,26 @@ output "key_management_server_ids" {
 }
 
 ##################################################
+# Cluster SSL Certificate Outputs (v2)
+##################################################
+
+output "ssl_certificates" {
+  description = "Map of managed cluster SSL certificates (metadata only; no private-key material is echoed)."
+  value = {
+    for k, v in nutanix_ssl_certificate_v2.ssl_certificate : k => {
+      ext_id                = v.id
+      cluster_ext_id        = v.cluster_ext_id
+      private_key_algorithm = v.private_key_algorithm
+    }
+  }
+}
+
+output "ssl_certificate_ids" {
+  description = "Map of SSL certificate keys to their external IDs (ext_id)."
+  value       = { for k, v in nutanix_ssl_certificate_v2.ssl_certificate : k => v.id }
+}
+
+##################################################
 # Summary
 ##################################################
 
@@ -74,5 +94,6 @@ output "security_summary" {
     total_key_management_servers = length(var.key_management_servers)
     azure_key_management_servers = length(local.azure_key_management_servers)
     kmip_key_management_servers  = length(local.kmip_key_management_servers)
+    total_ssl_certificates       = length(var.ssl_certificates)
   }
 }

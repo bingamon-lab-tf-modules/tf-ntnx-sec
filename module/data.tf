@@ -18,3 +18,26 @@ data "nutanix_network_security_policies_v2" "existing_policies" {}
 data "nutanix_key_management_servers_v2" "existing_key_management_servers" {
   count = var.enable_data_lookups ? 1 : 0
 }
+
+##################################################
+# Cluster SSL Certificates (v2)
+##################################################
+
+# Resolve each configured SSL-certificate cluster name to its ext_id. Runs once
+# per distinct cluster name; when no certificates are configured the for_each is
+# empty and no lookup is performed (module plans without live connectivity).
+data "nutanix_clusters_v2" "ssl_certificate_cluster" {
+  for_each = toset(local.ssl_certificate_cluster_names)
+
+  limit  = 1
+  filter = "name eq '${each.value}'"
+}
+
+# Gated read-only lookup of the SSL certificate currently installed on each
+# managed cluster. Disabled by default (enable_data_lookups = false); enable it
+# to reconcile against the certificate already present on the cluster.
+data "nutanix_ssl_certificate_v2" "existing_ssl_certificate" {
+  for_each = var.enable_data_lookups ? local.ssl_certificate_cluster_ext_id_by_key : {}
+
+  cluster_ext_id = each.value
+}

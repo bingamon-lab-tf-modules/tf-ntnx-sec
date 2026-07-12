@@ -165,3 +165,26 @@ resource "nutanix_key_management_server_v2" "key_management_server" {
     }
   }
 }
+
+##################################################
+# Cluster SSL Certificates (v2)
+##################################################
+
+# Installs a managed SSL certificate on each configured cluster. The target
+# cluster is named in var.ssl_certificates and resolved to its ext_id via
+# nutanix_clusters_v2 (see locals.tf). Only clusters that resolve get a
+# resource; unresolved names are caught by the ssl_certificates_resolve_cluster
+# check rather than producing a null cluster_ext_id here. Non-secret material
+# (public_certificate, ca_chain, private_key_algorithm) comes from
+# var.ssl_certificates; the private key and passphrase are pulled from the
+# sensitive var.ssl_certificate_keys, keyed by the same map key.
+resource "nutanix_ssl_certificate_v2" "ssl_certificate" {
+  for_each = local.ssl_certificate_existing
+
+  cluster_ext_id        = local.ssl_certificate_cluster_ext_ids[each.value.cluster_name]
+  public_certificate    = each.value.public_certificate
+  ca_chain              = each.value.ca_chain
+  private_key_algorithm = each.value.private_key_algorithm
+  private_key           = try(var.ssl_certificate_keys[each.key].private_key, null)
+  passphrase            = try(var.ssl_certificate_keys[each.key].passphrase, null)
+}

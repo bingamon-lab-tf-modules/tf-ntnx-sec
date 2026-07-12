@@ -31,4 +31,46 @@ locals {
   kmip_key_management_servers = {
     for k, v in var.key_management_servers : k => v if v.kmip != null
   }
+
+  ##################################################
+  # Cluster SSL Certificates (v2)
+  ##################################################
+
+  # Distinct cluster names referenced by the configured SSL certificates. When
+  # no certificates are configured this is empty, so no cluster lookups run and
+  # the module plans without live Prism Central connectivity.
+  ssl_certificate_cluster_names = distinct([for k, v in var.ssl_certificates : v.cluster_name])
+
+  # Resolve each referenced cluster name to its ext_id via nutanix_clusters_v2.
+  # The lookup is filtered by name; we additionally require the returned
+  # entity's name to match the request so a partial/no match yields null rather
+  # than a wrong ext_id.
+  ssl_certificate_cluster_ext_ids = {
+    for name in local.ssl_certificate_cluster_names :
+    name => try([
+      for e in data.nutanix_clusters_v2.ssl_certificate_cluster[name].cluster_entities :
+      e.ext_id if e.name == name
+    ][0], null)
+  }
+
+  # Cluster names that failed to resolve to an ext_id (surfaced by the
+  # ssl_certificates_resolve_cluster check).
+  ssl_certificate_missing_clusters = distinct([
+    for k, v in var.ssl_certificates :
+    v.cluster_name if lookup(local.ssl_certificate_cluster_ext_ids, v.cluster_name, null) == null
+  ])
+
+  # Only certificates whose cluster resolved get a managed resource; unresolved
+  # entries never reach the provider with a null cluster_ext_id.
+  ssl_certificate_existing = {
+    for k, v in var.ssl_certificates :
+    k => v if lookup(local.ssl_certificate_cluster_ext_ids, v.cluster_name, null) != null
+  }
+
+  # Resolved cluster ext_id per certificate key (drives the gated existing-cert
+  # data lookup).
+  ssl_certificate_cluster_ext_id_by_key = {
+    for k, v in local.ssl_certificate_existing :
+    k => local.ssl_certificate_cluster_ext_ids[v.cluster_name]
+  }
 }

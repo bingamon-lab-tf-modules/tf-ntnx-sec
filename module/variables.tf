@@ -202,3 +202,50 @@ variable "key_management_server_credentials" {
   default   = {}
   sensitive = true
 }
+
+##################################################
+# Cluster SSL Certificates (v2)
+##################################################
+
+variable "ssl_certificates" {
+  description = <<-EOT
+    A map of cluster SSL certificates to manage (nutanix_ssl_certificate_v2),
+    keyed by cluster. Each entry names the target cluster (`cluster_name`),
+    which is resolved to its ext_id at plan time via nutanix_clusters_v2, and
+    carries the NON-SECRET certificate material: the PEM-encoded public
+    certificate, an optional CA chain, and the private-key algorithm. The
+    private key itself and any passphrase are SECRET and supplied separately via
+    the sensitive `ssl_certificate_keys` variable, keyed by the same map key
+    (spec §10). NEVER put private-key material in this variable.
+  EOT
+  type = map(object({
+    cluster_name          = string
+    public_certificate    = optional(string, null)
+    ca_chain              = optional(string, null)
+    private_key_algorithm = optional(string, null)
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for k, v in var.ssl_certificates : length(trimspace(v.cluster_name)) > 0
+    ])
+    error_message = "Each SSL certificate entry must set a non-empty 'cluster_name'."
+  }
+}
+
+variable "ssl_certificate_keys" {
+  description = <<-EOT
+    Sensitive private-key material for the cluster SSL certificates declared in
+    `ssl_certificates`, keyed by the SAME map key. Supply `private_key` (the
+    PEM-encoded private key) and an optional `passphrase`. Feed these from
+    environment-backed TF_VAR_* inputs — never from YAML or committed files
+    (spec §10).
+  EOT
+  type = map(object({
+    private_key = optional(string, null)
+    passphrase  = optional(string, null)
+  }))
+  default   = {}
+  sensitive = true
+}
