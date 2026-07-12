@@ -140,23 +140,43 @@ output "ssl_certificate_ids" {
 }
 
 ##################################################
+# System-Account Password Change Outputs (v2)
+##################################################
+
+output "password_change_requests" {
+  description = "Map of executed password change requests (request metadata only; no password material is echoed). NOTE: this is a one-shot action — an entry here means a rotation was executed, not that state is continuously enforced."
+  value = {
+    for k, v in nutanix_password_change_request_v2.password_change_request : k => {
+      id     = v.id
+      ext_id = v.ext_id
+    }
+  }
+}
+
+output "password_change_request_ids" {
+  description = "Map of password change request keys to their request IDs."
+  value       = { for k, v in nutanix_password_change_request_v2.password_change_request : k => v.id }
+}
+
+##################################################
 # Summary
 ##################################################
 
 output "security_summary" {
   description = "Summary of security resources managed by this module."
   value = {
-    total_categories             = length(var.categories)
-    total_security_policies      = length(var.network_security_policies)
-    isolation_policies           = length(local.isolation_policies)
-    application_policies         = length(local.application_policies)
-    quarantine_policies          = length(local.quarantine_policies)
-    total_address_groups         = length(var.address_groups)
-    total_service_groups         = length(var.service_groups)
-    total_entity_groups          = length(var.entity_groups)
-    total_key_management_servers = length(var.key_management_servers)
-    azure_key_management_servers = length(local.azure_key_management_servers)
-    kmip_key_management_servers  = length(local.kmip_key_management_servers)
-    total_ssl_certificates       = length(var.ssl_certificates)
+    total_categories               = length(var.categories)
+    total_security_policies        = length(var.network_security_policies)
+    isolation_policies             = length(local.isolation_policies)
+    application_policies           = length(local.application_policies)
+    quarantine_policies            = length(local.quarantine_policies)
+    total_address_groups           = length(var.address_groups)
+    total_service_groups           = length(var.service_groups)
+    total_entity_groups            = length(var.entity_groups)
+    total_key_management_servers   = length(var.key_management_servers)
+    azure_key_management_servers   = length(local.azure_key_management_servers)
+    kmip_key_management_servers    = length(local.kmip_key_management_servers)
+    total_ssl_certificates         = length(var.ssl_certificates)
+    total_password_change_requests = length(var.password_change_requests)
   }
 }

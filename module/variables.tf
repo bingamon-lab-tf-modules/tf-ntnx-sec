@@ -487,3 +487,57 @@ variable "ssl_certificate_keys" {
   default   = {}
   sensitive = true
 }
+
+##################################################
+# System-Account Password Changes (v2)
+##################################################
+
+variable "password_change_requests" {
+  description = <<-EOT
+    A map of system-account password changes to execute
+    (nutanix_password_change_request_v2), keyed by an operator-chosen rotation
+    trigger. Each entry names WHICH account to rotate via `ext_id` (the system
+    user's external ID); it carries NO password material. The new password (and
+    optional current password) are supplied separately via the sensitive
+    `password_change_secrets` variable, keyed by the SAME map key (spec §10) —
+    passwords can never be expressed here.
+
+    ONE-SHOT ACTION, NOT DECLARATIVE STATE: creating an entry executes the
+    password change exactly once — it does NOT continuously enforce the password.
+    Re-running a rotation requires a changed for_each key or attribute (or a
+    manual taint): operators trigger a new rotation by ADDING or RENAMING a map
+    entry (e.g. `rotate_2026_q3_admin`). Destroying an entry does NOT restore the
+    old password.
+  EOT
+  type = map(object({
+    ext_id = string
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for k, v in var.password_change_requests : length(trimspace(v.ext_id)) > 0
+    ])
+    error_message = "Each password change request must set a non-empty 'ext_id' identifying the system user account to rotate."
+  }
+}
+
+variable "password_change_secrets" {
+  description = <<-EOT
+    Sensitive password material for the system-account rotations declared in
+    `password_change_requests`, keyed by the SAME map key. Supply `new_password`
+    (required — the new password to set) and optionally `current_password` (the
+    existing password, where the account requires it to authorize the change).
+    Feed these from environment-backed TF_VAR_* inputs — never from YAML or
+    committed files (spec §10).
+
+    A rotation runs exactly once per distinct map key; add or rename a key (in
+    both this map and `password_change_requests`) to trigger another rotation.
+  EOT
+  type = map(object({
+    new_password     = string
+    current_password = optional(string, null)
+  }))
+  default   = {}
+  sensitive = true
+}

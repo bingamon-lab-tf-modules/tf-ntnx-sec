@@ -73,4 +73,27 @@ locals {
     for k, v in local.ssl_certificate_existing :
     k => local.ssl_certificate_cluster_ext_ids[v.cluster_name]
   }
+
+  ##################################################
+  # System-Account Password Changes (v2)
+  ##################################################
+
+  # The set of request keys that have a new_password supplied in the sensitive
+  # password_change_secrets map. Only the KEYS are declassified with
+  # nonsensitive() — they are operator-chosen rotation triggers that already
+  # appear in the non-secret var.password_change_requests, so no password
+  # material is exposed. This keeps the for_each below non-sensitive (a sensitive
+  # value cannot be a for_each argument).
+  password_change_secret_keys = nonsensitive(toset([
+    for k, v in var.password_change_secrets : k if v.new_password != null
+  ]))
+
+  # Only requests that have a matching new_password get a managed resource.
+  # new_password is a required provider attribute, so a request without its
+  # secret would otherwise hard-error; excluding it here lets the
+  # password_change_secrets_present check surface a clear, actionable message.
+  password_change_requests_ready = {
+    for k, v in var.password_change_requests :
+    k => v if contains(local.password_change_secret_keys, k)
+  }
 }

@@ -359,3 +359,24 @@ resource "nutanix_ssl_certificate_v2" "ssl_certificate" {
   private_key           = try(var.ssl_certificate_keys[each.key].private_key, null)
   passphrase            = try(var.ssl_certificate_keys[each.key].passphrase, null)
 }
+
+##################################################
+# System-Account Password Changes (v2)
+##################################################
+
+# Executes a system-account password change per configured request. This is an
+# IMPERATIVE, ONE-SHOT action, not declarative state: applying an entry rotates
+# the password once and does not continuously enforce it. Operators re-trigger a
+# rotation by adding/renaming a for_each key (see var.password_change_requests).
+# The account to rotate (ext_id) comes from the non-secret
+# var.password_change_requests; the new (and optional current) password is pulled
+# from the sensitive var.password_change_secrets, keyed by the same map key. Only
+# requests with a matching secret get a resource (local.password_change_requests_ready);
+# missing secrets are caught by the password_change_secrets_present check.
+resource "nutanix_password_change_request_v2" "password_change_request" {
+  for_each = local.password_change_requests_ready
+
+  ext_id           = each.value.ext_id
+  new_password     = var.password_change_secrets[each.key].new_password
+  current_password = try(var.password_change_secrets[each.key].current_password, null)
+}

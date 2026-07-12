@@ -74,3 +74,15 @@ data "nutanix_ssl_certificate_v2" "existing_ssl_certificate" {
 
   cluster_ext_id = each.value
 }
+
+##################################################
+# System-Account Password Changes (v2)
+##################################################
+
+# Gated read-only lookup of system-user password metadata (username, status,
+# expiry, cluster) — never the password values themselves. Disabled by default
+# (enable_data_lookups = false) so the module plans without live Prism Central
+# connectivity; enable it to discover the ext_id of an account to rotate.
+data "nutanix_system_user_passwords_v2" "existing_system_user_passwords" {
+  count = var.enable_data_lookups ? 1 : 0
+}

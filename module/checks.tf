@@ -116,3 +116,18 @@ check "ssl_certificate_keys_present" {
     error_message = "Each SSL certificate needs a 'private_key' in the sensitive 'ssl_certificate_keys' map, keyed by the same map key."
   }
 }
+
+# Validate that every configured password change request has a matching
+# new_password in the sensitive password_change_secrets map, keyed identically.
+# new_password is a required provider attribute, so a missing secret is caught
+# here with a clear message rather than a raw required-argument error (the
+# request is also excluded from the managed resource; see locals.tf).
+check "password_change_secrets_present" {
+  assert {
+    condition = alltrue([
+      for k, v in var.password_change_requests :
+      try(var.password_change_secrets[k].new_password, null) != null
+    ])
+    error_message = "Each password change request needs a 'new_password' in the sensitive 'password_change_secrets' map, keyed by the same map key. Trigger a rotation by adding/renaming a matching entry in both maps."
+  }
+}
