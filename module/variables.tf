@@ -23,6 +23,14 @@ variable "category_values" {
     description  = optional(string, null)
   }))
   default = {}
+
+  validation {
+    condition = alltrue([
+      for k, v in var.category_values :
+      v.category_key != null && v.category_key != "" && v.value != null && v.value != ""
+    ])
+    error_message = "Category value 'category_key' and 'value' are required and must be non-empty strings."
+  }
 }
 
 ##################################################
@@ -104,6 +112,18 @@ variable "network_security_policies" {
       v.state == null || contains(["SAVE", "MONITOR", "ENFORCE"], v.state)
     ])
     error_message = "Network security policy 'state' must be one of: SAVE, MONITOR, ENFORCE."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.network_security_policies : alltrue([
+        for r in v.rules :
+        (r.spec.two_env_isolation_rule_spec != null ? 1 : 0)
+        + (r.spec.application_rule_spec != null ? 1 : 0)
+        + (r.spec.intra_entity_group_rule_spec != null ? 1 : 0) == 1
+      ])
+    ])
+    error_message = "Each network security policy rule 'spec' must set exactly one of: two_env_isolation_rule_spec, application_rule_spec, intra_entity_group_rule_spec."
   }
 }
 
