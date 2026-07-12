@@ -1,35 +1,22 @@
 ##################################################
-# Category Keys
+# Categories (v2)
 ##################################################
 
-variable "category_keys" {
-  description = "A map of category keys to manage in Nutanix."
+variable "categories" {
+  description = "A map of category key/value pairs to manage in Nutanix. Each entry maps to one nutanix_category_v2 resource (key + value + optional description). Creating a pair under a pre-existing key needs no special handling."
   type = map(object({
-    name        = string
+    key         = string
+    value       = string
     description = optional(string, null)
-  }))
-  default = {}
-}
-
-##################################################
-# Category Values
-##################################################
-
-variable "category_values" {
-  description = "A map of category values to manage in Nutanix. The 'category_key' must reference a key from 'category_keys' or an existing category key name."
-  type = map(object({
-    category_key = string
-    value        = string
-    description  = optional(string, null)
   }))
   default = {}
 
   validation {
     condition = alltrue([
-      for k, v in var.category_values :
-      v.category_key != null && v.category_key != "" && v.value != null && v.value != ""
+      for k, v in var.categories :
+      can(regex("^[a-zA-Z0-9._-]+$", v.key)) && can(regex("^[a-zA-Z0-9._-]+$", v.value))
     ])
-    error_message = "Category value 'category_key' and 'value' are required and must be non-empty strings."
+    error_message = "Category 'key' and 'value' are required, must be non-empty, and may contain only letters, digits, dots, underscores, and hyphens."
   }
 }
 
@@ -125,72 +112,4 @@ variable "network_security_policies" {
     ])
     error_message = "Each network security policy rule 'spec' must set exactly one of: two_env_isolation_rule_spec, application_rule_spec, intra_entity_group_rule_spec."
   }
-}
-
-##################################################
-# Network Security Rules (v1 - legacy)
-##################################################
-
-variable "network_security_rules" {
-  description = "A map of network security rules (v1) to manage in Nutanix Flow."
-  type = map(object({
-    name        = string
-    description = optional(string, null)
-
-    # Isolation Rule
-    isolation_rule_action = optional(string, null)
-
-    isolation_rule_first_entity_filter_kind_list = optional(list(string), [])
-    isolation_rule_first_entity_filter_type      = optional(string, null)
-    isolation_rule_first_entity_filter_params = optional(list(object({
-      name   = string
-      values = list(string)
-    })), [])
-
-    isolation_rule_second_entity_filter_kind_list = optional(list(string), [])
-    isolation_rule_second_entity_filter_type      = optional(string, null)
-    isolation_rule_second_entity_filter_params = optional(list(object({
-      name   = string
-      values = list(string)
-    })), [])
-
-    # Application Rule
-    app_rule_action = optional(string, null)
-
-    app_rule_target_group_default_internal_policy = optional(string, null)
-    app_rule_target_group_peer_specification_type = optional(string, null)
-    app_rule_target_group_filter_kind_list        = optional(list(string), [])
-    app_rule_target_group_filter_type             = optional(string, null)
-    app_rule_target_group_filter_params = optional(list(object({
-      name   = string
-      values = list(string)
-    })), [])
-
-    app_rule_inbound_allow_list = optional(list(object({
-      peer_specification_type = optional(string, null)
-      ip_subnet               = optional(string, null)
-      ip_subnet_prefix_length = optional(string, null)
-      protocol                = optional(string, null)
-      filter_type             = optional(string, null)
-      filter_kind_list        = optional(list(string), [])
-      filter_params = optional(list(object({
-        name   = string
-        values = list(string)
-      })), [])
-    })), [])
-
-    app_rule_outbound_allow_list = optional(list(object({
-      peer_specification_type = optional(string, null)
-      ip_subnet               = optional(string, null)
-      ip_subnet_prefix_length = optional(string, null)
-      protocol                = optional(string, null)
-      filter_type             = optional(string, null)
-      filter_kind_list        = optional(list(string), [])
-      filter_params = optional(list(object({
-        name   = string
-        values = list(string)
-      })), [])
-    })), [])
-  }))
-  default = {}
 }

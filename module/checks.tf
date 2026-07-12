@@ -1,11 +1,11 @@
-# Validate that category values reference valid category keys.
-check "category_values_reference_valid_keys" {
+# Validate that every category defines a non-empty key and value.
+check "categories_have_key_and_value" {
   assert {
     condition = alltrue([
-      for k, v in var.category_values :
-      contains(keys(local.managed_category_key_names), v.category_key) || length(v.category_key) > 0
+      for k, v in var.categories :
+      length(v.key) > 0 && length(v.value) > 0
     ])
-    error_message = "Category values must reference a managed category key or a valid existing category key name."
+    error_message = "Each category must define a non-empty 'key' and 'value'."
   }
 }
 
