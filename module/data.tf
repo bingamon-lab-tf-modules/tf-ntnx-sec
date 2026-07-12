@@ -86,3 +86,25 @@ data "nutanix_ssl_certificate_v2" "existing_ssl_certificate" {
 data "nutanix_system_user_passwords_v2" "existing_system_user_passwords" {
   count = var.enable_data_lookups ? 1 : 0
 }
+
+##################################################
+# Cluster Configuration Profiles (v2)
+##################################################
+
+# Resolve each cluster NAME referenced as association intent (var.cluster_profiles
+# [*].clusters) to its ext_id. Runs once per distinct name; when no profiles
+# reference any clusters the for_each is empty and no lookup is performed (module
+# plans without live Prism Central connectivity).
+data "nutanix_clusters_v2" "cluster_profile_cluster" {
+  for_each = toset(local.cluster_profile_cluster_names)
+
+  limit  = 1
+  filter = "name eq '${each.value}'"
+}
+
+# Gated read-only lookup of existing cluster profiles. Disabled by default
+# (enable_data_lookups = false) so the module plans without live Prism Central
+# connectivity; enable it to reconcile against already-defined profiles.
+data "nutanix_cluster_profiles_v2" "existing_cluster_profiles" {
+  count = var.enable_data_lookups ? 1 : 0
+}

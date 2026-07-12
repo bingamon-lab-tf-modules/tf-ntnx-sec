@@ -541,3 +541,121 @@ variable "password_change_secrets" {
   default   = {}
   sensitive = true
 }
+
+##################################################
+# Cluster Configuration Profiles (v2)
+##################################################
+
+variable "cluster_profiles" {
+  description = <<-EOT
+    A map of cluster configuration profiles to manage
+    (nutanix_cluster_profile_v2) — governance-grade drift control for
+    cluster-level settings (DNS/name servers, NTP, remote syslog, Pulse
+    telemetry, allowed overrides, NFS subnet whitelist). Each entry sets a
+    `name` and the non-secret setting blocks it governs.
+
+    ASSOCIATION INTENT (`clusters`): the 2.4.2 nutanix_cluster_profile_v2
+    resource has NO input to associate/apply the profile to clusters — its
+    `clusters` attribute is read-only. The cluster→profile association is set
+    CLUSTER-SIDE (via each cluster's `cluster_profile_ext_id`). This module
+    therefore treats the per-profile `clusters` list (cluster NAMES) as
+    association INTENT: it resolves the names to ext_ids at plan time and
+    surfaces them via the `cluster_profile_cluster_associations` output for the
+    cluster/PE module to consume. Unknown names are caught by the
+    `cluster_profiles_resolve_clusters` check.
+
+    SECRET-BEARING BLOCKS DEFERRED: the provider's `smtp_server` and
+    `snmp_config` blocks carry credential material (SMTP password, SNMP
+    auth/priv keys, trap community string). Per the module's secret-handling
+    convention (spec §10 — secrets flow through separate sensitive vars, never
+    YAML), those two blocks are intentionally not modelled here and are left to
+    a follow-up that adds a paired sensitive `cluster_profile_secrets` var.
+  EOT
+  type = map(object({
+    name        = string
+    description = optional(string, null)
+
+    # Governance override policy: which setting groups a bound cluster may
+    # override locally. Values per the v4 clustermgmt profile API.
+    allowed_overrides     = optional(list(string), [])
+    nfs_subnet_white_list = optional(list(string), [])
+
+    # Association INTENT: cluster NAMES this profile should apply to. Resolved
+    # to ext_ids and exposed via cluster_profile_cluster_associations; NOT
+    # passed to the resource (2.4.2 has no association input — see var docs).
+    clusters = optional(list(string), [])
+
+    # DNS name servers. Each entry sets exactly one of ipv4 / ipv6.
+    name_server_ip_list = optional(list(object({
+      ipv4 = optional(object({
+        value         = string
+        prefix_length = optional(number, null)
+      }), null)
+      ipv6 = optional(object({
+        value         = string
+        prefix_length = optional(number, null)
+      }), null)
+    })), [])
+
+    # NTP servers. Each entry sets exactly one of fqdn / ipv4 / ipv6.
+    ntp_server_ip_list = optional(list(object({
+      fqdn = optional(object({
+        value = string
+      }), null)
+      ipv4 = optional(object({
+        value         = string
+        prefix_length = optional(number, null)
+      }), null)
+      ipv6 = optional(object({
+        value         = string
+        prefix_length = optional(number, null)
+      }), null)
+    })), [])
+
+    # Remote syslog (rsyslog) servers.
+    rsyslog_server_list = optional(list(object({
+      server_name      = string
+      port             = number
+      network_protocol = string # UDP, TCP, RELP, TLS (per v4 API)
+      ip_address = optional(object({
+        ipv4 = optional(object({
+          value         = string
+          prefix_length = optional(number, null)
+        }), null)
+        ipv6 = optional(object({
+          value         = string
+          prefix_length = optional(number, null)
+        }), null)
+      }), null)
+      modules = optional(list(object({
+        name                     = string
+        log_severity_level       = string
+        should_log_monitor_files = optional(bool, null)
+      })), [])
+    })), [])
+
+    # Pulse (telemetry) configuration.
+    pulse_status = optional(object({
+      is_enabled          = optional(bool, null)
+      pii_scrubbing_level = optional(string, null)
+    }), null)
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for k, v in var.cluster_profiles : length(trimspace(v.name)) > 0
+    ])
+    error_message = "Each cluster profile must define a non-empty 'name'."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.cluster_profiles : alltrue([
+        for o in v.allowed_overrides :
+        contains(["NFS_SUBNET_WHITELIST_CONFIG", "NTP_SERVER_CONFIG", "SNMP_SERVER_CONFIG", "SMTP_SERVER_CONFIG", "PULSE_CONFIG", "NAME_SERVER_CONFIG", "RSYSLOG_SERVER_CONFIG"], o)
+      ])
+    ])
+    error_message = "Each cluster profile 'allowed_overrides' value must be one of: NFS_SUBNET_WHITELIST_CONFIG, NTP_SERVER_CONFIG, SNMP_SERVER_CONFIG, SMTP_SERVER_CONFIG, PULSE_CONFIG, NAME_SERVER_CONFIG, RSYSLOG_SERVER_CONFIG."
+  }
+}

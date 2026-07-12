@@ -159,6 +159,36 @@ output "password_change_request_ids" {
 }
 
 ##################################################
+# Cluster Configuration Profile Outputs (v2)
+##################################################
+
+output "cluster_profiles" {
+  description = "Map of managed cluster configuration profiles (metadata only)."
+  value = {
+    for k, v in nutanix_cluster_profile_v2.cluster_profile : k => {
+      ext_id = v.ext_id
+      name   = v.name
+    }
+  }
+}
+
+output "cluster_profile_ids" {
+  description = "Map of cluster profile keys to their external IDs (ext_id)."
+  value       = { for k, v in nutanix_cluster_profile_v2.cluster_profile : k => v.ext_id }
+}
+
+output "cluster_profile_cluster_associations" {
+  description = <<-EOT
+    Map of cluster profile key -> resolved cluster ext_ids (association intent).
+    The 2.4.2 nutanix_cluster_profile_v2 resource does NOT accept cluster
+    associations; consume this in the cluster/PE module to set each cluster's
+    cluster_profile_ext_id. Unresolved names are omitted and flagged by the
+    cluster_profiles_resolve_clusters check.
+  EOT
+  value       = local.cluster_profile_cluster_associations
+}
+
+##################################################
 # Summary
 ##################################################
 
@@ -178,5 +208,6 @@ output "security_summary" {
     kmip_key_management_servers    = length(local.kmip_key_management_servers)
     total_ssl_certificates         = length(var.ssl_certificates)
     total_password_change_requests = length(var.password_change_requests)
+    total_cluster_profiles         = length(var.cluster_profiles)
   }
 }

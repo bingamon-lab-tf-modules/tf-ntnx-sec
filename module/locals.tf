@@ -96,4 +96,50 @@ locals {
     for k, v in var.password_change_requests :
     k => v if contains(local.password_change_secret_keys, k)
   }
+
+  ##################################################
+  # Cluster Configuration Profiles (v2)
+  ##################################################
+
+  # Distinct cluster names referenced as association intent across all profiles.
+  # When no profile references a cluster this is empty, so no cluster lookups run
+  # and the module plans without live Prism Central connectivity.
+  cluster_profile_cluster_names = distinct(flatten([
+    for k, v in var.cluster_profiles : v.clusters
+  ]))
+
+  # Resolve each referenced cluster name to its ext_id via nutanix_clusters_v2.
+  # The lookup is filtered by name; we additionally require the returned entity's
+  # name to match the request so a partial/no match yields null rather than a
+  # wrong ext_id.
+  cluster_profile_cluster_ext_ids = {
+    for name in local.cluster_profile_cluster_names :
+    name => try([
+      for e in data.nutanix_clusters_v2.cluster_profile_cluster[name].cluster_entities :
+      e.ext_id if e.name == name
+    ][0], null)
+  }
+
+  # Cluster names referenced by a profile that failed to resolve to an ext_id
+  # (surfaced by the cluster_profiles_resolve_clusters check).
+  cluster_profile_missing_clusters = distinct(flatten([
+    for k, v in var.cluster_profiles : [
+      for name in v.clusters :
+      name if lookup(local.cluster_profile_cluster_ext_ids, name, null) == null
+    ]
+  ]))
+
+  # Per-profile resolved cluster ext_ids (association intent → ext_ids). The
+  # 2.4.2 nutanix_cluster_profile_v2 resource has no association input; this map
+  # is exposed as an output for the cluster/PE module to bind cluster-side via
+  # cluster_profile_ext_id. Unresolved names are dropped here and flagged by the
+  # cluster_profiles_resolve_clusters check.
+  cluster_profile_cluster_associations = {
+    for k, v in var.cluster_profiles :
+    k => [
+      for name in v.clusters :
+      local.cluster_profile_cluster_ext_ids[name]
+      if lookup(local.cluster_profile_cluster_ext_ids, name, null) != null
+    ]
+  }
 }

@@ -131,3 +131,14 @@ check "password_change_secrets_present" {
     error_message = "Each password change request needs a 'new_password' in the sensitive 'password_change_secrets' map, keyed by the same map key. Trigger a rotation by adding/renaming a matching entry in both maps."
   }
 }
+
+# Validate that every cluster name referenced as a cluster profile's association
+# intent (var.cluster_profiles[*].clusters) resolves to an ext_id via
+# nutanix_clusters_v2. An unknown cluster name surfaces here with a clear message
+# instead of silently dropping to a null ext_id in the associations output.
+check "cluster_profiles_resolve_clusters" {
+  assert {
+    condition     = length(local.cluster_profile_missing_clusters) == 0
+    error_message = "The following cluster profile 'clusters' names did not resolve to a cluster in Nutanix: ${jsonencode(local.cluster_profile_missing_clusters)}. Ensure each name matches an existing cluster."
+  }
+}

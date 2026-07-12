@@ -380,3 +380,117 @@ resource "nutanix_password_change_request_v2" "password_change_request" {
   new_password     = var.password_change_secrets[each.key].new_password
   current_password = try(var.password_change_secrets[each.key].current_password, null)
 }
+
+##################################################
+# Cluster Configuration Profiles (v2)
+##################################################
+
+# One nutanix_cluster_profile_v2 per entry: a PC-scoped governance profile that
+# pins cluster-level settings (DNS/name servers, NTP, remote syslog, Pulse,
+# allowed overrides, NFS subnet whitelist) for drift control. The resource does
+# NOT accept a cluster-association input in 2.4.2 (its `clusters` attribute is
+# read-only); the per-profile association intent (var.cluster_profiles[*].clusters)
+# is resolved to ext_ids in locals.tf and exposed via the
+# cluster_profile_cluster_associations output for the cluster/PE module to bind
+# cluster-side. Secret-bearing blocks (smtp_server, snmp_config) are deliberately
+# not modelled (see var.cluster_profiles docs).
+resource "nutanix_cluster_profile_v2" "cluster_profile" {
+  for_each = var.cluster_profiles
+
+  name                  = each.value.name
+  description           = each.value.description
+  allowed_overrides     = length(each.value.allowed_overrides) > 0 ? each.value.allowed_overrides : null
+  nfs_subnet_white_list = length(each.value.nfs_subnet_white_list) > 0 ? each.value.nfs_subnet_white_list : null
+
+  dynamic "name_server_ip_list" {
+    for_each = each.value.name_server_ip_list
+    content {
+      dynamic "ipv4" {
+        for_each = name_server_ip_list.value.ipv4 != null ? [name_server_ip_list.value.ipv4] : []
+        content {
+          value         = ipv4.value.value
+          prefix_length = ipv4.value.prefix_length
+        }
+      }
+      dynamic "ipv6" {
+        for_each = name_server_ip_list.value.ipv6 != null ? [name_server_ip_list.value.ipv6] : []
+        content {
+          value         = ipv6.value.value
+          prefix_length = ipv6.value.prefix_length
+        }
+      }
+    }
+  }
+
+  dynamic "ntp_server_ip_list" {
+    for_each = each.value.ntp_server_ip_list
+    content {
+      dynamic "fqdn" {
+        for_each = ntp_server_ip_list.value.fqdn != null ? [ntp_server_ip_list.value.fqdn] : []
+        content {
+          value = fqdn.value.value
+        }
+      }
+      dynamic "ipv4" {
+        for_each = ntp_server_ip_list.value.ipv4 != null ? [ntp_server_ip_list.value.ipv4] : []
+        content {
+          value         = ipv4.value.value
+          prefix_length = ipv4.value.prefix_length
+        }
+      }
+      dynamic "ipv6" {
+        for_each = ntp_server_ip_list.value.ipv6 != null ? [ntp_server_ip_list.value.ipv6] : []
+        content {
+          value         = ipv6.value.value
+          prefix_length = ipv6.value.prefix_length
+        }
+      }
+    }
+  }
+
+  dynamic "rsyslog_server_list" {
+    for_each = each.value.rsyslog_server_list
+    content {
+      server_name      = rsyslog_server_list.value.server_name
+      port             = rsyslog_server_list.value.port
+      network_protocol = rsyslog_server_list.value.network_protocol
+
+      dynamic "ip_address" {
+        for_each = rsyslog_server_list.value.ip_address != null ? [rsyslog_server_list.value.ip_address] : []
+        content {
+          dynamic "ipv4" {
+            for_each = ip_address.value.ipv4 != null ? [ip_address.value.ipv4] : []
+            content {
+              value         = ipv4.value.value
+              prefix_length = ipv4.value.prefix_length
+            }
+          }
+          dynamic "ipv6" {
+            for_each = ip_address.value.ipv6 != null ? [ip_address.value.ipv6] : []
+            content {
+              value         = ipv6.value.value
+              prefix_length = ipv6.value.prefix_length
+            }
+          }
+        }
+      }
+
+      dynamic "modules" {
+        for_each = rsyslog_server_list.value.modules
+        content {
+          name                     = modules.value.name
+          log_severity_level       = modules.value.log_severity_level
+          should_log_monitor_files = modules.value.should_log_monitor_files
+        }
+      }
+    }
+  }
+
+  dynamic "pulse_status" {
+    for_each = each.value.pulse_status != null ? [each.value.pulse_status] : []
+    content {
+      is_enabled          = pulse_status.value.is_enabled
+      pii_scrubbing_level = pulse_status.value.pii_scrubbing_level
+    }
+  }
+}
