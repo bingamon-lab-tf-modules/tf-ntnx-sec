@@ -81,6 +81,26 @@ output "service_group_ids" {
 }
 
 ##################################################
+# Entity Group Outputs (v2 - Flow microsegmentation)
+##################################################
+
+output "entity_groups" {
+  description = "Map of created entity groups (metadata only)."
+  value = {
+    for k, v in nutanix_entity_group_v2.entity_group : k => {
+      ext_id      = v.ext_id
+      name        = v.name
+      description = v.description
+    }
+  }
+}
+
+output "entity_group_ids" {
+  description = "Map of entity group keys to their external IDs (ext_id)."
+  value       = { for k, v in nutanix_entity_group_v2.entity_group : k => v.ext_id }
+}
+
+##################################################
 # Key Management Server Outputs (v2)
 ##################################################
 
@@ -133,6 +153,7 @@ output "security_summary" {
     quarantine_policies          = length(local.quarantine_policies)
     total_address_groups         = length(var.address_groups)
     total_service_groups         = length(var.service_groups)
+    total_entity_groups          = length(var.entity_groups)
     total_key_management_servers = length(var.key_management_servers)
     azure_key_management_servers = length(local.azure_key_management_servers)
     kmip_key_management_servers  = length(local.kmip_key_management_servers)

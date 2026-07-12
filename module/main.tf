@@ -170,6 +170,105 @@ resource "nutanix_service_groups_v2" "service_group" {
 }
 
 ##################################################
+# Entity Groups (v2 - Flow microsegmentation)
+##################################################
+
+# One nutanix_entity_group_v2 per entry: a microsegmentation policy object that
+# selects entities (VMs/subnets/VPCs by category, address groups by ext_id/IP,
+# or Kubernetes objects) via an optional allowed_config and/or except_config.
+# Each config carries one or more entities; an entity may name references
+# (reference_ext_ids/kube_entities) and/or inline IPv4 addresses and ranges. A
+# bare name+description (no config) is a valid empty group. except_config
+# entities do not accept kube_entities (per the 2.4.2 provider schema).
+resource "nutanix_entity_group_v2" "entity_group" {
+  for_each = var.entity_groups
+
+  name        = each.value.name
+  description = each.value.description
+
+  dynamic "allowed_config" {
+    for_each = each.value.allowed_config != null ? [each.value.allowed_config] : []
+    content {
+      dynamic "entities" {
+        for_each = allowed_config.value.entities
+        content {
+          type              = entities.value.type
+          selected_by       = entities.value.selected_by
+          reference_ext_ids = length(entities.value.reference_ext_ids) > 0 ? entities.value.reference_ext_ids : null
+          kube_entities     = length(entities.value.kube_entities) > 0 ? entities.value.kube_entities : null
+
+          dynamic "addresses" {
+            for_each = length(entities.value.ipv4_addresses) > 0 ? [entities.value.ipv4_addresses] : []
+            content {
+              dynamic "ipv4_addresses" {
+                for_each = addresses.value
+                content {
+                  value         = ipv4_addresses.value.value
+                  prefix_length = ipv4_addresses.value.prefix_length
+                }
+              }
+            }
+          }
+
+          dynamic "ip_ranges" {
+            for_each = length(entities.value.ipv4_ranges) > 0 ? [entities.value.ipv4_ranges] : []
+            content {
+              dynamic "ipv4_ranges" {
+                for_each = ip_ranges.value
+                content {
+                  start_ip = ipv4_ranges.value.start_ip
+                  end_ip   = ipv4_ranges.value.end_ip
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  dynamic "except_config" {
+    for_each = each.value.except_config != null ? [each.value.except_config] : []
+    content {
+      dynamic "entities" {
+        for_each = except_config.value.entities
+        content {
+          type              = entities.value.type
+          selected_by       = entities.value.selected_by
+          reference_ext_ids = length(entities.value.reference_ext_ids) > 0 ? entities.value.reference_ext_ids : null
+
+          dynamic "addresses" {
+            for_each = length(entities.value.ipv4_addresses) > 0 ? [entities.value.ipv4_addresses] : []
+            content {
+              dynamic "ipv4_addresses" {
+                for_each = addresses.value
+                content {
+                  value         = ipv4_addresses.value.value
+                  prefix_length = ipv4_addresses.value.prefix_length
+                }
+              }
+            }
+          }
+
+          dynamic "ip_ranges" {
+            for_each = length(entities.value.ipv4_ranges) > 0 ? [entities.value.ipv4_ranges] : []
+            content {
+              dynamic "ipv4_ranges" {
+                for_each = ip_ranges.value
+                content {
+                  start_ip = ipv4_ranges.value.start_ip
+                  end_ip   = ipv4_ranges.value.end_ip
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+##################################################
 # Key Management Servers (v2)
 ##################################################
 

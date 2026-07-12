@@ -227,6 +227,132 @@ variable "service_groups" {
 }
 
 ##################################################
+# Entity Groups (v2 - Flow microsegmentation)
+##################################################
+
+variable "entity_groups" {
+  description = <<-EOT
+    A map of Flow entity groups (microsegmentation policy objects) to manage
+    (nutanix_entity_group_v2). Each entry sets a name and, optionally, an
+    `allowed_config` and/or `except_config` describing which entities the group
+    selects. Each config holds one or more `entities` blocks; an entity pairs a
+    `type` (VM, SUBNET, VPC, ADDRESS_GROUP, KUBE_NAMESPACE, KUBE_SERVICE,
+    KUBE_CLUSTER, KUBE_PODS) with a `selected_by` method (CATEGORY_EXT_ID,
+    EXT_ID, IP_VALUES, LABELS, NAME) and the matching members:
+    `reference_ext_ids` (category/subnet/vpc/address-group ext_ids),
+    `kube_entities` (Kubernetes identifiers, allowed_config only), or inline
+    `ipv4_addresses` (value + prefix_length) / `ipv4_ranges` (start_ip/end_ip).
+    A bare name + description (no config) is valid. Entity groups are referenced
+    as sources/targets by network security policies.
+  EOT
+  type = map(object({
+    name        = string
+    description = optional(string, null)
+    allowed_config = optional(object({
+      entities = list(object({
+        type              = optional(string, null)
+        selected_by       = optional(string, null)
+        reference_ext_ids = optional(list(string), [])
+        kube_entities     = optional(list(string), [])
+        ipv4_addresses = optional(list(object({
+          value         = string
+          prefix_length = optional(number, null)
+        })), [])
+        ipv4_ranges = optional(list(object({
+          start_ip = string
+          end_ip   = string
+        })), [])
+      }))
+    }), null)
+    except_config = optional(object({
+      entities = list(object({
+        type              = optional(string, null)
+        selected_by       = optional(string, null)
+        reference_ext_ids = optional(list(string), [])
+        ipv4_addresses = optional(list(object({
+          value         = string
+          prefix_length = optional(number, null)
+        })), [])
+        ipv4_ranges = optional(list(object({
+          start_ip = string
+          end_ip   = string
+        })), [])
+      }))
+    }), null)
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for k, v in var.entity_groups : length(trimspace(v.name)) > 0
+    ])
+    error_message = "Each entity group must define a non-empty 'name'."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.entity_groups :
+      v.allowed_config == null ? true : alltrue([
+        for e in v.allowed_config.entities :
+        e.type == null || contains(["VM", "SUBNET", "VPC", "ADDRESS_GROUP", "KUBE_NAMESPACE", "KUBE_SERVICE", "KUBE_CLUSTER", "KUBE_PODS"], coalesce(e.type, "_"))
+      ])
+    ])
+    error_message = "Each allowed_config entity 'type' must be one of: VM, SUBNET, VPC, ADDRESS_GROUP, KUBE_NAMESPACE, KUBE_SERVICE, KUBE_CLUSTER, KUBE_PODS."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.entity_groups :
+      v.allowed_config == null ? true : alltrue([
+        for e in v.allowed_config.entities :
+        e.selected_by == null || contains(["IP_VALUES", "EXT_ID", "CATEGORY_EXT_ID", "LABELS", "NAME"], coalesce(e.selected_by, "_"))
+      ])
+    ])
+    error_message = "Each allowed_config entity 'selected_by' must be one of: IP_VALUES, EXT_ID, CATEGORY_EXT_ID, LABELS, NAME."
+  }
+
+  # except_config is deliberately narrow in the 2.4.2 provider: it only excludes
+  # address groups selected by ext_id or literal IP values.
+  validation {
+    condition = alltrue([
+      for k, v in var.entity_groups :
+      v.except_config == null ? true : alltrue([
+        for e in v.except_config.entities :
+        (e.type == null || coalesce(e.type, "_") == "ADDRESS_GROUP") &&
+        (e.selected_by == null || contains(["EXT_ID", "IP_VALUES"], coalesce(e.selected_by, "_")))
+      ])
+    ])
+    error_message = "Each except_config entity must set 'type' = ADDRESS_GROUP and 'selected_by' one of: EXT_ID, IP_VALUES."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.entity_groups : alltrue(concat(
+        [for e in(v.allowed_config != null ? v.allowed_config.entities : []) :
+        e.type == null || e.selected_by == null || contains(["CATEGORY_EXT_ID:VM", "CATEGORY_EXT_ID:SUBNET", "CATEGORY_EXT_ID:VPC", "EXT_ID:KUBE_CLUSTER", "EXT_ID:ADDRESS_GROUP", "LABELS:KUBE_PODS", "NAME:KUBE_NAMESPACE", "NAME:KUBE_SERVICE", "IP_VALUES:ADDRESS_GROUP"], "${coalesce(e.selected_by, "_")}:${coalesce(e.type, "_")}")],
+        [for e in(v.except_config != null ? v.except_config.entities : []) :
+        e.type == null || e.selected_by == null || contains(["CATEGORY_EXT_ID:VM", "CATEGORY_EXT_ID:SUBNET", "CATEGORY_EXT_ID:VPC", "EXT_ID:KUBE_CLUSTER", "EXT_ID:ADDRESS_GROUP", "LABELS:KUBE_PODS", "NAME:KUBE_NAMESPACE", "NAME:KUBE_SERVICE", "IP_VALUES:ADDRESS_GROUP"], "${coalesce(e.selected_by, "_")}:${coalesce(e.type, "_")}")]
+      ))
+    ])
+    error_message = "Each entity must use a valid (selected_by, type) pair: (CATEGORY_EXT_ID, VM/SUBNET/VPC), (EXT_ID, KUBE_CLUSTER/ADDRESS_GROUP), (LABELS, KUBE_PODS), (NAME, KUBE_NAMESPACE/KUBE_SERVICE), (IP_VALUES, ADDRESS_GROUP)."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.entity_groups : alltrue(concat(
+        [for e in(v.allowed_config != null ? v.allowed_config.entities : []) : alltrue([
+          for a in e.ipv4_addresses : a.prefix_length == null || (coalesce(a.prefix_length, 0) >= 0 && coalesce(a.prefix_length, 0) <= 32)
+        ])],
+        [for e in(v.except_config != null ? v.except_config.entities : []) : alltrue([
+          for a in e.ipv4_addresses : a.prefix_length == null || (coalesce(a.prefix_length, 0) >= 0 && coalesce(a.prefix_length, 0) <= 32)
+        ])]
+      ))
+    ])
+    error_message = "Each entity 'ipv4_addresses' entry 'prefix_length' must be between 0 and 32."
+  }
+}
+
+##################################################
 # Data Lookups
 ##################################################
 

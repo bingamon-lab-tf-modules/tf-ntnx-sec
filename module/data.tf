@@ -31,6 +31,17 @@ data "nutanix_service_groups_v2" "existing_service_groups" {
 }
 
 ##################################################
+# Entity Groups (v2 - Flow microsegmentation)
+##################################################
+
+# Gated read-only lookup of existing Flow entity groups. Disabled by default
+# (enable_data_lookups = false) so the module plans without live Prism Central
+# connectivity; enable it to reconcile against already-defined entity groups.
+data "nutanix_entity_groups_v2" "existing_entity_groups" {
+  count = var.enable_data_lookups ? 1 : 0
+}
+
+##################################################
 # Key Management Servers (v2)
 ##################################################
 

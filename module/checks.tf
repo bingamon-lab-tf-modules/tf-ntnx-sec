@@ -44,6 +44,23 @@ check "service_groups_have_services" {
   }
 }
 
+# Validate that every entity group entity uses a documented (selected_by, type)
+# pair. Mirrors the var.entity_groups validation; an unsupported combination is
+# rejected by Nutanix Flow, so surface it here with a clear message.
+check "entity_groups_valid_selection" {
+  assert {
+    condition = alltrue([
+      for k, v in var.entity_groups : alltrue(concat(
+        [for e in(v.allowed_config != null ? v.allowed_config.entities : []) :
+        e.type == null || e.selected_by == null || contains(["CATEGORY_EXT_ID:VM", "CATEGORY_EXT_ID:SUBNET", "CATEGORY_EXT_ID:VPC", "EXT_ID:KUBE_CLUSTER", "EXT_ID:ADDRESS_GROUP", "LABELS:KUBE_PODS", "NAME:KUBE_NAMESPACE", "NAME:KUBE_SERVICE", "IP_VALUES:ADDRESS_GROUP"], "${coalesce(e.selected_by, "_")}:${coalesce(e.type, "_")}")],
+        [for e in(v.except_config != null ? v.except_config.entities : []) :
+        e.type == null || e.selected_by == null || contains(["CATEGORY_EXT_ID:VM", "CATEGORY_EXT_ID:SUBNET", "CATEGORY_EXT_ID:VPC", "EXT_ID:KUBE_CLUSTER", "EXT_ID:ADDRESS_GROUP", "LABELS:KUBE_PODS", "NAME:KUBE_NAMESPACE", "NAME:KUBE_SERVICE", "IP_VALUES:ADDRESS_GROUP"], "${coalesce(e.selected_by, "_")}:${coalesce(e.type, "_")}")]
+      ))
+    ])
+    error_message = "Each entity group entity must use a valid (selected_by, type) pair per Nutanix Flow microsegmentation."
+  }
+}
+
 # Validate that every configured key management server exposes an endpoint:
 # Azure requires an endpoint URL; KMIP requires at least one endpoint, each with
 # at least one IPv4/IPv6/FQDN address.
