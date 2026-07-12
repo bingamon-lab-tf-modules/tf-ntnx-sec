@@ -232,3 +232,110 @@ output "security_summary" {
     total_image_placement_policies = length(var.image_placement_policies)
   }
 }
+
+##################################################
+# Aggregate Output (spec §7.6 contract)
+##################################################
+
+output "outputs" {
+  description = "Aggregate of all module outputs (spec §7.6 contract, consumed by the landing zone as module.<x>.outputs)."
+  value = {
+    categories = {
+      for k, v in nutanix_category_v2.category : k => {
+        ext_id      = v.id
+        key         = v.key
+        value       = v.value
+        description = v.description
+      }
+    }
+    category_ids = { for k, v in nutanix_category_v2.category : k => v.id }
+    network_security_policies = {
+      for k, v in nutanix_network_security_policy_v2.policy : k => {
+        ext_id = v.ext_id
+        name   = v.name
+        type   = v.type
+        state  = v.state
+      }
+    }
+    network_security_policy_ids = { for k, v in nutanix_network_security_policy_v2.policy : k => v.ext_id }
+    address_groups = {
+      for k, v in nutanix_address_groups_v2.address_group : k => {
+        ext_id      = v.ext_id
+        name        = v.name
+        description = v.description
+      }
+    }
+    address_group_ids = { for k, v in nutanix_address_groups_v2.address_group : k => v.ext_id }
+    service_groups = {
+      for k, v in nutanix_service_groups_v2.service_group : k => {
+        ext_id      = v.ext_id
+        name        = v.name
+        description = v.description
+      }
+    }
+    service_group_ids = { for k, v in nutanix_service_groups_v2.service_group : k => v.ext_id }
+    entity_groups = {
+      for k, v in nutanix_entity_group_v2.entity_group : k => {
+        ext_id      = v.ext_id
+        name        = v.name
+        description = v.description
+      }
+    }
+    entity_group_ids = { for k, v in nutanix_entity_group_v2.entity_group : k => v.ext_id }
+    key_management_servers = {
+      for k, v in nutanix_key_management_server_v2.key_management_server : k => {
+        ext_id = v.ext_id
+        name   = v.name
+      }
+    }
+    key_management_server_ids = { for k, v in nutanix_key_management_server_v2.key_management_server : k => v.ext_id }
+    ssl_certificates = {
+      for k, v in nutanix_ssl_certificate_v2.ssl_certificate : k => {
+        ext_id                = v.id
+        cluster_ext_id        = v.cluster_ext_id
+        private_key_algorithm = v.private_key_algorithm
+      }
+    }
+    ssl_certificate_ids = { for k, v in nutanix_ssl_certificate_v2.ssl_certificate : k => v.id }
+    password_change_requests = {
+      for k, v in nutanix_password_change_request_v2.password_change_request : k => {
+        id     = v.id
+        ext_id = v.ext_id
+      }
+    }
+    password_change_request_ids = { for k, v in nutanix_password_change_request_v2.password_change_request : k => v.id }
+    cluster_profiles = {
+      for k, v in nutanix_cluster_profile_v2.cluster_profile : k => {
+        ext_id = v.ext_id
+        name   = v.name
+      }
+    }
+    cluster_profile_ids                  = { for k, v in nutanix_cluster_profile_v2.cluster_profile : k => v.ext_id }
+    cluster_profile_cluster_associations = local.cluster_profile_cluster_associations
+    image_placement_policies = {
+      for k, v in nutanix_image_placement_policy_v2.image_placement_policy : k => {
+        ext_id         = v.ext_id
+        name           = v.name
+        placement_type = v.placement_type
+      }
+    }
+    image_placement_policy_ids = { for k, v in nutanix_image_placement_policy_v2.image_placement_policy : k => v.ext_id }
+    security_summary = {
+      total_categories               = length(var.categories)
+      total_security_policies        = length(var.network_security_policies)
+      isolation_policies             = length(local.isolation_policies)
+      application_policies           = length(local.application_policies)
+      quarantine_policies            = length(local.quarantine_policies)
+      total_address_groups           = length(var.address_groups)
+      total_service_groups           = length(var.service_groups)
+      total_entity_groups            = length(var.entity_groups)
+      total_key_management_servers   = length(var.key_management_servers)
+      azure_key_management_servers   = length(local.azure_key_management_servers)
+      kmip_key_management_servers    = length(local.kmip_key_management_servers)
+      total_ssl_certificates         = length(var.ssl_certificates)
+      total_password_change_requests = length(var.password_change_requests)
+      total_cluster_profiles         = length(var.cluster_profiles)
+      total_image_placement_policies = length(var.image_placement_policies)
+    }
+  }
+}

@@ -89,6 +89,7 @@ No modules.
 | <a name="output_key_management_servers"></a> [key\_management\_servers](#output\_key\_management\_servers) | Map of registered key management servers (metadata only; no credential material is echoed). |
 | <a name="output_network_security_policies"></a> [network\_security\_policies](#output\_network\_security\_policies) | Map of created network security policies. |
 | <a name="output_network_security_policy_ids"></a> [network\_security\_policy\_ids](#output\_network\_security\_policy\_ids) | Map of network security policy keys to their external IDs. |
+| <a name="output_outputs"></a> [outputs](#output\_outputs) | Aggregate of all module outputs (spec §7.6 contract, consumed by the landing zone as module.<x>.outputs). |
 | <a name="output_password_change_request_ids"></a> [password\_change\_request\_ids](#output\_password\_change\_request\_ids) | Map of password change request keys to their request IDs. |
 | <a name="output_password_change_requests"></a> [password\_change\_requests](#output\_password\_change\_requests) | Map of executed password change requests (request metadata only; no password material is echoed). NOTE: this is a one-shot action — an entry here means a rotation was executed, not that state is continuously enforced. |
 | <a name="output_security_summary"></a> [security\_summary](#output\_security\_summary) | Summary of security resources managed by this module. |
