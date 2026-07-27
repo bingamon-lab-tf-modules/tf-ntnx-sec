@@ -2,11 +2,31 @@
 # Data Sources for Security
 ##################################################
 
-# Lookup existing categories
-data "nutanix_categories_v2" "existing_categories" {}
+# Gated read-only lookup of existing categories, for parity with every other
+# discovery lookup in this file. Neither this nor 'existing_policies' below is
+# referenced by any local, resource or output — they exist purely for
+# reconciliation — so running them unconditionally only cost an API call per
+# plan.
+data "nutanix_categories_v2" "existing_categories" {
+  count = var.enable_data_lookups ? 1 : 0
+}
 
-# Lookup existing network security policies
-data "nutanix_network_security_policies_v2" "existing_policies" {}
+# Gated read-only lookup of existing network security policies.
+#
+# MUST stay gated. This reads /api/microseg/, which hard-fails when Flow
+# Network Security is not enabled:
+#
+#   MIC-10006 kMicrosegDisabledError: This operation is not allowed since Flow
+#   Network Security is not yet enabled.
+#
+# Because a data source is read during PLAN, an ungated version broke `plan`
+# outright on any Prism Central without Flow — even when the caller had
+# configured no policies at all and wanted nothing from this module but a
+# category. Every sibling Flow lookup below was already gated; this one was
+# missed.
+data "nutanix_network_security_policies_v2" "existing_policies" {
+  count = var.enable_data_lookups ? 1 : 0
+}
 
 ##################################################
 # Address Groups (v2 - Flow)
