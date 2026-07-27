@@ -76,3 +76,4 @@ trivycache
 utilize
 prek
 nixos
+ungated
