@@ -77,3 +77,6 @@ utilize
 prek
 nixos
 ungated
+SecretSpec
+mktemp
+bingamon

@@ -10,14 +10,14 @@ A description of the module goes here.
 ## Requirements
 
 | Name | Version |
-|------|---------|
+| ---- | ------- |
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.10.0 |
 | <a name="requirement_nutanix"></a> [nutanix](#requirement\_nutanix) | >= 2.4.2 |
 
 ## Providers
 
 | Name | Version |
-|------|---------|
+| ---- | ------- |
 | <a name="provider_nutanix"></a> [nutanix](#provider\_nutanix) | 2.4.2 |
 
 ## Modules
@@ -27,7 +27,7 @@ No modules.
 ## Resources
 
 | Name | Type |
-|------|------|
+| ---- | ---- |
 | [nutanix_address_groups_v2.address_group](https://registry.terraform.io/providers/nutanix/nutanix/latest/docs/resources/address_groups_v2) | resource |
 | [nutanix_category_v2.category](https://registry.terraform.io/providers/nutanix/nutanix/latest/docs/resources/category_v2) | resource |
 | [nutanix_cluster_profile_v2.cluster_profile](https://registry.terraform.io/providers/nutanix/nutanix/latest/docs/resources/cluster_profile_v2) | resource |
@@ -54,7 +54,7 @@ No modules.
 ## Inputs
 
 | Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
+| ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_address_groups"></a> [address\_groups](#input\_address\_groups) | A map of Flow address groups (reusable IP sets) to manage<br/>(nutanix\_address\_groups\_v2). Each entry sets a name and at least one member:<br/>an `ipv4_addresses` entry (a value + prefix\_length, e.g. 10.0.10.0/24) or an<br/>`ip_ranges` entry (start\_ip/end\_ip). Address groups are referenced by<br/>network security policy application rules via their ext\_id<br/>(`src_address_group_references` / `dest_address_group_references`). | <pre>map(object({<br/>    name        = string<br/>    description = optional(string, null)<br/>    ipv4_addresses = optional(list(object({<br/>      value         = string<br/>      prefix_length = number<br/>    })), [])<br/>    ip_ranges = optional(list(object({<br/>      start_ip = string<br/>      end_ip   = string<br/>    })), [])<br/>  }))</pre> | `{}` | no |
 | <a name="input_categories"></a> [categories](#input\_categories) | A map of category key/value pairs to manage in Nutanix. Each entry maps to one nutanix\_category\_v2 resource (key + value + optional description). Creating a pair under a pre-existing key needs no special handling. | <pre>map(object({<br/>    key         = string<br/>    value       = string<br/>    description = optional(string, null)<br/>  }))</pre> | `{}` | no |
 | <a name="input_cluster_profiles"></a> [cluster\_profiles](#input\_cluster\_profiles) | A map of cluster configuration profiles to manage<br/>(nutanix\_cluster\_profile\_v2) — governance-grade drift control for<br/>cluster-level settings (DNS/name servers, NTP, remote syslog, Pulse<br/>telemetry, allowed overrides, NFS subnet whitelist). Each entry sets a<br/>`name` and the non-secret setting blocks it governs.<br/><br/>ASSOCIATION INTENT (`clusters`): the 2.4.2 nutanix\_cluster\_profile\_v2<br/>resource has NO input to associate/apply the profile to clusters — its<br/>`clusters` attribute is read-only. The cluster→profile association is set<br/>CLUSTER-SIDE (via each cluster's `cluster_profile_ext_id`). This module<br/>therefore treats the per-profile `clusters` list (cluster NAMES) as<br/>association INTENT: it resolves the names to ext\_ids at plan time and<br/>surfaces them via the `cluster_profile_cluster_associations` output for the<br/>cluster/PE module to consume. Unknown names are caught by the<br/>`cluster_profiles_resolve_clusters` check.<br/><br/>SECRET-BEARING BLOCKS DEFERRED: the provider's `smtp_server` and<br/>`snmp_config` blocks carry credential material (SMTP password, SNMP<br/>auth/priv keys, trap community string). Per the module's secret-handling<br/>convention (spec §10 — secrets flow through separate sensitive vars, never<br/>YAML), those two blocks are intentionally not modelled here and are left to<br/>a follow-up that adds a paired sensitive `cluster_profile_secrets` var. | <pre>map(object({<br/>    name        = string<br/>    description = optional(string, null)<br/><br/>    # Governance override policy: which setting groups a bound cluster may<br/>    # override locally. Values per the v4 clustermgmt profile API.<br/>    allowed_overrides     = optional(list(string), [])<br/>    nfs_subnet_white_list = optional(list(string), [])<br/><br/>    # Association INTENT: cluster NAMES this profile should apply to. Resolved<br/>    # to ext_ids and exposed via cluster_profile_cluster_associations; NOT<br/>    # passed to the resource (2.4.2 has no association input — see var docs).<br/>    clusters = optional(list(string), [])<br/><br/>    # DNS name servers. Each entry sets exactly one of ipv4 / ipv6.<br/>    name_server_ip_list = optional(list(object({<br/>      ipv4 = optional(object({<br/>        value         = string<br/>        prefix_length = optional(number, null)<br/>      }), null)<br/>      ipv6 = optional(object({<br/>        value         = string<br/>        prefix_length = optional(number, null)<br/>      }), null)<br/>    })), [])<br/><br/>    # NTP servers. Each entry sets exactly one of fqdn / ipv4 / ipv6.<br/>    ntp_server_ip_list = optional(list(object({<br/>      fqdn = optional(object({<br/>        value = string<br/>      }), null)<br/>      ipv4 = optional(object({<br/>        value         = string<br/>        prefix_length = optional(number, null)<br/>      }), null)<br/>      ipv6 = optional(object({<br/>        value         = string<br/>        prefix_length = optional(number, null)<br/>      }), null)<br/>    })), [])<br/><br/>    # Remote syslog (rsyslog) servers.<br/>    rsyslog_server_list = optional(list(object({<br/>      server_name      = string<br/>      port             = number<br/>      network_protocol = string # UDP, TCP, RELP, TLS (per v4 API)<br/>      ip_address = optional(object({<br/>        ipv4 = optional(object({<br/>          value         = string<br/>          prefix_length = optional(number, null)<br/>        }), null)<br/>        ipv6 = optional(object({<br/>          value         = string<br/>          prefix_length = optional(number, null)<br/>        }), null)<br/>      }), null)<br/>      modules = optional(list(object({<br/>        name                     = string<br/>        log_severity_level       = string<br/>        should_log_monitor_files = optional(bool, null)<br/>      })), [])<br/>    })), [])<br/><br/>    # Pulse (telemetry) configuration.<br/>    pulse_status = optional(object({<br/>      is_enabled          = optional(bool, null)<br/>      pii_scrubbing_level = optional(string, null)<br/>    }), null)<br/>  }))</pre> | `{}` | no |
@@ -73,7 +73,7 @@ No modules.
 ## Outputs
 
 | Name | Description |
-|------|-------------|
+| ---- | ----------- |
 | <a name="output_address_group_ids"></a> [address\_group\_ids](#output\_address\_group\_ids) | Map of address group keys to their external IDs (ext\_id). |
 | <a name="output_address_groups"></a> [address\_groups](#output\_address\_groups) | Map of created address groups (metadata only). |
 | <a name="output_categories"></a> [categories](#output\_categories) | Map of created categories (one key/value pair per entry). |
