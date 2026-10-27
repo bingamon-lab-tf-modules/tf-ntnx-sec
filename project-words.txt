@@ -80,3 +80,5 @@ ungated
 SecretSpec
 mktemp
 bingamon
+esac
+secops
