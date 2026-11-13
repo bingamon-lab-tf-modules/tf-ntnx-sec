@@ -193,7 +193,7 @@ resource "nutanix_entity_group_v2" "entity_group" {
         for_each = allowed_config.value.entities
         content {
           type              = entities.value.type
-          selected_by       = entities.value.selected_by
+          select_by         = entities.value.select_by != null ? entities.value.select_by : entities.value.selected_by
           reference_ext_ids = length(entities.value.reference_ext_ids) > 0 ? entities.value.reference_ext_ids : null
           kube_entities     = length(entities.value.kube_entities) > 0 ? entities.value.kube_entities : null
 
@@ -234,7 +234,7 @@ resource "nutanix_entity_group_v2" "entity_group" {
         for_each = except_config.value.entities
         content {
           type              = entities.value.type
-          selected_by       = entities.value.selected_by
+          select_by         = entities.value.select_by != null ? entities.value.select_by : entities.value.selected_by
           reference_ext_ids = length(entities.value.reference_ext_ids) > 0 ? entities.value.reference_ext_ids : null
 
           dynamic "addresses" {

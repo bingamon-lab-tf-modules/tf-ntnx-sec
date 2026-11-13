@@ -151,3 +151,32 @@ run "ssl_cluster_name_required" {
 
   expect_failures = [var.ssl_certificates]
 }
+
+# Test 6: Gated SSL certificate lookup (enable_data_lookups = true) plans
+# cleanly when private_key and passphrase on data.nutanix_ssl_certificate_v2
+# are marked sensitive in v2.5.1.
+run "ssl_data_lookups_enabled" {
+  command = plan
+
+  variables {
+    enable_data_lookups = true
+    ssl_certificates = {
+      mock_cluster = {
+        cluster_name          = "mock-cluster"
+        public_certificate    = "mock-public-certificate"
+        private_key_algorithm = "RSA_2048"
+      }
+    }
+    ssl_certificate_keys = {
+      mock_cluster = {
+        private_key = "mock-private-key-material"
+        passphrase  = "mock-passphrase"
+      }
+    }
+  }
+
+  assert {
+    condition     = output.ssl_certificates["mock_cluster"].cluster_ext_id == "00000000-0000-0000-0000-000000000000"
+    error_message = "Expected SSL certificate to plan cleanly with enable_data_lookups = true"
+  }
+}

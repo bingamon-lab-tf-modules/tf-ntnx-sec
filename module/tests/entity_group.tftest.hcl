@@ -79,12 +79,12 @@ run "entity_groups_allowed_config" {
           entities = [
             {
               type              = "VM"
-              selected_by       = "CATEGORY_EXT_ID"
+              select_by         = "CATEGORY_EXT_ID"
               reference_ext_ids = ["11111111-1111-1111-1111-111111111111"]
             },
             {
-              type        = "ADDRESS_GROUP"
-              selected_by = "IP_VALUES"
+              type      = "ADDRESS_GROUP"
+              select_by = "IP_VALUES"
               ipv4_addresses = [
                 { value = "10.0.0.0", prefix_length = 24 },
               ]
@@ -110,7 +110,7 @@ run "entity_groups_allowed_config" {
 }
 
 # Test 4: An except_config entity excluding an address group by IP range (the
-# only shape the 2.4.2 provider permits for except_config) plans cleanly.
+# only shape the provider permits for except_config) plans cleanly.
 run "entity_groups_except_config" {
   command = plan
 
@@ -122,7 +122,7 @@ run "entity_groups_except_config" {
           entities = [
             {
               type              = "SUBNET"
-              selected_by       = "CATEGORY_EXT_ID"
+              select_by         = "CATEGORY_EXT_ID"
               reference_ext_ids = ["22222222-2222-2222-2222-222222222222"]
             },
           ]
@@ -130,8 +130,8 @@ run "entity_groups_except_config" {
         except_config = {
           entities = [
             {
-              type        = "ADDRESS_GROUP"
-              selected_by = "IP_VALUES"
+              type      = "ADDRESS_GROUP"
+              select_by = "IP_VALUES"
               ipv4_ranges = [
                 { start_ip = "10.0.0.240", end_ip = "10.0.0.254" },
               ]
@@ -158,7 +158,7 @@ run "entity_groups_invalid_type" {
         name = "bad"
         allowed_config = {
           entities = [
-            { type = "SERVERS", selected_by = "CATEGORY_EXT_ID" },
+            { type = "SERVERS", select_by = "CATEGORY_EXT_ID" },
           ]
         }
       }
@@ -168,8 +168,8 @@ run "entity_groups_invalid_type" {
   expect_failures = [var.entity_groups]
 }
 
-# Test 6: A valid type and selected_by used as an unsupported pair (VM by
-# IP_VALUES) fails the (selected_by, type) pair validation.
+# Test 6: A valid type and select_by used as an unsupported pair (VM by
+# IP_VALUES) fails the (select_by, type) pair validation.
 run "entity_groups_invalid_pair" {
   command = plan
 
@@ -179,7 +179,7 @@ run "entity_groups_invalid_pair" {
         name = "bad"
         allowed_config = {
           entities = [
-            { type = "VM", selected_by = "IP_VALUES" },
+            { type = "VM", select_by = "IP_VALUES" },
           ]
         }
       }
@@ -200,7 +200,7 @@ run "entity_groups_except_rejects_non_address_group" {
         name = "bad"
         except_config = {
           entities = [
-            { type = "VM", selected_by = "IP_VALUES" },
+            { type = "VM", select_by = "IP_VALUES" },
           ]
         }
       }
@@ -221,11 +221,64 @@ run "entity_groups_invalid_prefix" {
         allowed_config = {
           entities = [
             {
-              type        = "ADDRESS_GROUP"
-              selected_by = "IP_VALUES"
+              type      = "ADDRESS_GROUP"
+              select_by = "IP_VALUES"
               ipv4_addresses = [
                 { value = "10.0.0.0", prefix_length = 40 },
               ]
+            },
+          ]
+        }
+      }
+    }
+  }
+
+  expect_failures = [var.entity_groups]
+}
+
+# Test 9: Legacy 'selected_by' input remains supported as a backward-compatible
+# alias and maps to the provider's 'select_by' attribute cleanly.
+run "entity_groups_legacy_selected_by_alias" {
+  command = plan
+
+  variables {
+    entity_groups = {
+      legacy_caller = {
+        name = "legacy-caller"
+        allowed_config = {
+          entities = [
+            {
+              type              = "VM"
+              selected_by       = "CATEGORY_EXT_ID"
+              reference_ext_ids = ["11111111-1111-1111-1111-111111111111"]
+            },
+          ]
+        }
+      }
+    }
+  }
+
+  assert {
+    condition     = length(output.entity_group_ids) == 1
+    error_message = "Expected legacy selected_by alias to plan cleanly"
+  }
+}
+
+# Test 10: Setting conflicting 'select_by' and 'selected_by' values fails
+# variable validation.
+run "entity_groups_conflicting_select_by_fails" {
+  command = plan
+
+  variables {
+    entity_groups = {
+      conflict = {
+        name = "conflict"
+        allowed_config = {
+          entities = [
+            {
+              type        = "ADDRESS_GROUP"
+              select_by   = "IP_VALUES"
+              selected_by = "EXT_ID"
             },
           ]
         }
