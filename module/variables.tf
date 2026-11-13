@@ -237,8 +237,9 @@ variable "entity_groups" {
     `allowed_config` and/or `except_config` describing which entities the group
     selects. Each config holds one or more `entities` blocks; an entity pairs a
     `type` (VM, SUBNET, VPC, ADDRESS_GROUP, KUBE_NAMESPACE, KUBE_SERVICE,
-    KUBE_CLUSTER, KUBE_PODS) with a `selected_by` method (CATEGORY_EXT_ID,
-    EXT_ID, IP_VALUES, LABELS, NAME) and the matching members:
+    KUBE_CLUSTER, KUBE_PODS) with a `select_by` method (CATEGORY_EXT_ID,
+    EXT_ID, IP_VALUES, LABELS, NAME; `selected_by` is also accepted as a
+    deprecated alias for backward compatibility) and the matching members:
     `reference_ext_ids` (category/subnet/vpc/address-group ext_ids),
     `kube_entities` (Kubernetes identifiers, allowed_config only), or inline
     `ipv4_addresses` (value + prefix_length) / `ipv4_ranges` (start_ip/end_ip).
@@ -251,6 +252,7 @@ variable "entity_groups" {
     allowed_config = optional(object({
       entities = list(object({
         type              = optional(string, null)
+        select_by         = optional(string, null)
         selected_by       = optional(string, null)
         reference_ext_ids = optional(list(string), [])
         kube_entities     = optional(list(string), [])
@@ -267,6 +269,7 @@ variable "entity_groups" {
     except_config = optional(object({
       entities = list(object({
         type              = optional(string, null)
+        select_by         = optional(string, null)
         selected_by       = optional(string, null)
         reference_ext_ids = optional(list(string), [])
         ipv4_addresses = optional(list(object({
@@ -291,6 +294,18 @@ variable "entity_groups" {
 
   validation {
     condition = alltrue([
+      for k, v in var.entity_groups : alltrue(concat(
+        [for e in(v.allowed_config != null ? v.allowed_config.entities : []) :
+        e.select_by == null || e.selected_by == null || e.select_by == e.selected_by],
+        [for e in(v.except_config != null ? v.except_config.entities : []) :
+        e.select_by == null || e.selected_by == null || e.select_by == e.selected_by]
+      ))
+    ])
+    error_message = "Each entity group entity cannot set conflicting 'select_by' and 'selected_by' values; prefer 'select_by'."
+  }
+
+  validation {
+    condition = alltrue([
       for k, v in var.entity_groups :
       v.allowed_config == null ? true : alltrue([
         for e in v.allowed_config.entities :
@@ -305,13 +320,13 @@ variable "entity_groups" {
       for k, v in var.entity_groups :
       v.allowed_config == null ? true : alltrue([
         for e in v.allowed_config.entities :
-        e.selected_by == null || contains(["IP_VALUES", "EXT_ID", "CATEGORY_EXT_ID", "LABELS", "NAME"], coalesce(e.selected_by, "_"))
+        (e.select_by == null && e.selected_by == null) || contains(["IP_VALUES", "EXT_ID", "CATEGORY_EXT_ID", "LABELS", "NAME"], coalesce(e.select_by != null ? e.select_by : e.selected_by, "_"))
       ])
     ])
-    error_message = "Each allowed_config entity 'selected_by' must be one of: IP_VALUES, EXT_ID, CATEGORY_EXT_ID, LABELS, NAME."
+    error_message = "Each allowed_config entity 'select_by' must be one of: IP_VALUES, EXT_ID, CATEGORY_EXT_ID, LABELS, NAME."
   }
 
-  # except_config is deliberately narrow in the 2.4.2 provider: it only excludes
+  # except_config is deliberately narrow in the provider schema: it only excludes
   # address groups selected by ext_id or literal IP values.
   validation {
     condition = alltrue([
@@ -319,22 +334,22 @@ variable "entity_groups" {
       v.except_config == null ? true : alltrue([
         for e in v.except_config.entities :
         (e.type == null || coalesce(e.type, "_") == "ADDRESS_GROUP") &&
-        (e.selected_by == null || contains(["EXT_ID", "IP_VALUES"], coalesce(e.selected_by, "_")))
+        ((e.select_by == null && e.selected_by == null) || contains(["EXT_ID", "IP_VALUES"], coalesce(e.select_by != null ? e.select_by : e.selected_by, "_")))
       ])
     ])
-    error_message = "Each except_config entity must set 'type' = ADDRESS_GROUP and 'selected_by' one of: EXT_ID, IP_VALUES."
+    error_message = "Each except_config entity must set 'type' = ADDRESS_GROUP and 'select_by' one of: EXT_ID, IP_VALUES."
   }
 
   validation {
     condition = alltrue([
       for k, v in var.entity_groups : alltrue(concat(
         [for e in(v.allowed_config != null ? v.allowed_config.entities : []) :
-        e.type == null || e.selected_by == null || contains(["CATEGORY_EXT_ID:VM", "CATEGORY_EXT_ID:SUBNET", "CATEGORY_EXT_ID:VPC", "EXT_ID:KUBE_CLUSTER", "EXT_ID:ADDRESS_GROUP", "LABELS:KUBE_PODS", "NAME:KUBE_NAMESPACE", "NAME:KUBE_SERVICE", "IP_VALUES:ADDRESS_GROUP"], "${coalesce(e.selected_by, "_")}:${coalesce(e.type, "_")}")],
+        e.type == null || (e.select_by == null && e.selected_by == null) || contains(["CATEGORY_EXT_ID:VM", "CATEGORY_EXT_ID:SUBNET", "CATEGORY_EXT_ID:VPC", "EXT_ID:KUBE_CLUSTER", "EXT_ID:ADDRESS_GROUP", "LABELS:KUBE_PODS", "NAME:KUBE_NAMESPACE", "NAME:KUBE_SERVICE", "IP_VALUES:ADDRESS_GROUP"], "${coalesce(e.select_by != null ? e.select_by : e.selected_by, "_")}:${coalesce(e.type, "_")}")],
         [for e in(v.except_config != null ? v.except_config.entities : []) :
-        e.type == null || e.selected_by == null || contains(["CATEGORY_EXT_ID:VM", "CATEGORY_EXT_ID:SUBNET", "CATEGORY_EXT_ID:VPC", "EXT_ID:KUBE_CLUSTER", "EXT_ID:ADDRESS_GROUP", "LABELS:KUBE_PODS", "NAME:KUBE_NAMESPACE", "NAME:KUBE_SERVICE", "IP_VALUES:ADDRESS_GROUP"], "${coalesce(e.selected_by, "_")}:${coalesce(e.type, "_")}")]
+        e.type == null || (e.select_by == null && e.selected_by == null) || contains(["CATEGORY_EXT_ID:VM", "CATEGORY_EXT_ID:SUBNET", "CATEGORY_EXT_ID:VPC", "EXT_ID:KUBE_CLUSTER", "EXT_ID:ADDRESS_GROUP", "LABELS:KUBE_PODS", "NAME:KUBE_NAMESPACE", "NAME:KUBE_SERVICE", "IP_VALUES:ADDRESS_GROUP"], "${coalesce(e.select_by != null ? e.select_by : e.selected_by, "_")}:${coalesce(e.type, "_")}")]
       ))
     ])
-    error_message = "Each entity must use a valid (selected_by, type) pair: (CATEGORY_EXT_ID, VM/SUBNET/VPC), (EXT_ID, KUBE_CLUSTER/ADDRESS_GROUP), (LABELS, KUBE_PODS), (NAME, KUBE_NAMESPACE/KUBE_SERVICE), (IP_VALUES, ADDRESS_GROUP)."
+    error_message = "Each entity must use a valid (select_by, type) pair: (CATEGORY_EXT_ID, VM/SUBNET/VPC), (EXT_ID, KUBE_CLUSTER/ADDRESS_GROUP), (LABELS, KUBE_PODS), (NAME, KUBE_NAMESPACE/KUBE_SERVICE), (IP_VALUES, ADDRESS_GROUP)."
   }
 
   validation {
